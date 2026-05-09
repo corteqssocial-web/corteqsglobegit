@@ -157,10 +157,11 @@ function MainScreen() {
         ))}
       </aside>
 
-      {/* Bottom-right: Add pin FAB */}
-      <div className="absolute bottom-6 right-6 z-20">
+      {/* Bottom-center: Add pin FAB (moved from bottom-right to avoid Emergent badge overlay) */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50">
         <Button
           data-testid="add-pin-fab"
+          aria-pressed={addMode}
           onClick={() => {
             if (!user) { setAuthOpen(true); return; }
             setAddMode((m) => !m);
@@ -177,9 +178,9 @@ function MainScreen() {
       </div>
 
       {/* Bottom-left: helper / count */}
-      <div className="absolute bottom-6 left-6 z-20 text-xs text-white/40" data-testid="footer-info">
+      <div className="absolute bottom-6 left-6 z-20 text-xs text-white/40 max-w-[260px]" data-testid="footer-info">
         <div>{pins.length} pin · {filter === "all" ? "tüm kategoriler" : PIN_TYPES[filter]?.label}</div>
-        <div className="opacity-60 mt-1">Sürükle: döndür · Scroll: zoom · Çift parmak: pinch zoom</div>
+        <div className="opacity-60 mt-1">Sürükle: döndür · Scroll: zoom · Çift parmak: pinch</div>
       </div>
 
       {/* Modals */}
