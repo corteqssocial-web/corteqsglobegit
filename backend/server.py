@@ -33,8 +33,10 @@ GOOGLE_GEOCODING_API_KEY = os.environ["GOOGLE_GEOCODING_API_KEY"]
 EMERGENT_AUTH_URL = os.environ.get("EMERGENT_AUTH_URL", "https://demobackend.emergentagent.com")
 ADMIN_EMAILS = [e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
 
-# Service role client bypasses RLS — used for admin ops + writes
+# Service role client bypasses RLS — used for ALL data ops (never touch .auth on this!)
 sb: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+# Separate client for user auth operations (sign_in/sign_up mutate session — keep isolated)
+sb_auth: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 app = FastAPI(title="CorteQS Diaspora Globe API")
 api = APIRouter(prefix="/api")
@@ -101,7 +103,11 @@ def is_admin_email(email: Optional[str]) -> bool:
     return email.lower() in ADMIN_EMAILS
 
 
-async def upsert_profile(user_id: str, email: str, name: str = "", picture: str = "", provider: str = "supabase") -> dict:
+async def ensure_profile(user_id: str, email: str, name: str = "", picture: str = "", provider: str = "supabase") -> dict:
+    """Insert profile if missing; otherwise return existing. Never overwrites is_admin (computed live)."""
+    existing = sb.table("profiles").select("*").eq("id", user_id).limit(1).execute()
+    if existing.data:
+        return existing.data[0]
     payload = {
         "id": user_id,
         "email": email,
@@ -110,7 +116,7 @@ async def upsert_profile(user_id: str, email: str, name: str = "", picture: str 
         "provider": provider,
         "is_admin": is_admin_email(email),
     }
-    sb.table("profiles").upsert(payload, on_conflict="id").execute()
+    sb.table("profiles").insert(payload).execute()
     return payload
 
 
@@ -145,7 +151,7 @@ async def get_user_from_emergent_cookie(request: Request) -> Optional[dict]:
         "email": p["email"],
         "name": p.get("name") or "",
         "picture": p.get("picture") or "",
-        "is_admin": bool(p.get("is_admin")),
+        "is_admin": is_admin_email(p["email"]),  # live check, not stored value
         "provider": p.get("provider") or "emergent",
     }
 
@@ -183,7 +189,8 @@ def get_user_from_supabase_jwt(request: Request) -> Optional[dict]:
 async def current_user(request: Request) -> Optional[dict]:
     user = get_user_from_supabase_jwt(request)
     if user:
-        await upsert_profile(user["id"], user["email"], user["name"], user.get("picture", ""), "supabase")
+        # Read-only: ensure profile exists once (insert if missing). is_admin computed live.
+        await ensure_profile(user["id"], user["email"], user.get("name", ""), user.get("picture", ""), "supabase")
         return user
     return await get_user_from_emergent_cookie(request)
 
@@ -216,7 +223,8 @@ def health():
 # ---------- Routes: Supabase Email/Password Auth (signup/login proxy) ----------
 @api.post("/auth/signup")
 async def signup(body: SignupIn):
-    """Create Supabase auth user (admin API), then create profile."""
+    """Create Supabase auth user (admin API), then create profile, then sign in for tokens."""
+    # 1) Create user (admin API on service-role client — uses GoTrue admin endpoint, doesn't mutate session)
     try:
         res = sb.auth.admin.create_user({
             "email": body.email,
@@ -225,40 +233,57 @@ async def signup(body: SignupIn):
             "user_metadata": {"name": body.name or ""},
         })
         user = res.user
-        await upsert_profile(user.id, user.email, body.name or "", "", "supabase")
-        # Sign in to get session
-        login = sb.auth.sign_in_with_password({"email": body.email, "password": body.password})
-        sess = login.session
-        return {
-            "access_token": sess.access_token,
-            "refresh_token": sess.refresh_token,
-            "user": {"id": user.id, "email": user.email, "name": body.name or "", "is_admin": is_admin_email(user.email)},
-        }
     except Exception as e:
         msg = str(e)
         if "already" in msg.lower() or "duplicate" in msg.lower() or "registered" in msg.lower():
             raise HTTPException(status_code=409, detail="Email already registered")
+        log.exception("signup create_user failed")
         raise HTTPException(status_code=400, detail=msg)
+
+    # 2) Ensure profile (data write — uses service-role client, never mutated by auth)
+    await ensure_profile(user.id, user.email, body.name or "", "", "supabase")
+
+    # 3) Sign in via the SEPARATE auth client (never use `sb` for sign_in — would corrupt service-role session)
+    try:
+        login_res = sb_auth.auth.sign_in_with_password({"email": body.email, "password": body.password})
+        sess = login_res.session
+    except Exception:
+        log.exception("signup post-create sign_in failed")
+        raise HTTPException(status_code=500, detail="Account created but sign-in failed; please try logging in")
+
+    return {
+        "access_token": sess.access_token,
+        "refresh_token": sess.refresh_token,
+        "user": {"id": user.id, "email": user.email, "name": body.name or "", "is_admin": is_admin_email(user.email)},
+    }
 
 
 @api.post("/auth/login")
 async def login(body: LoginIn):
+    # Use sb_auth (anon-key client) to NOT corrupt the service-role session on `sb`
     try:
-        res = sb.auth.sign_in_with_password({"email": body.email, "password": body.password})
-        sess = res.session
-        user = res.user
-        await upsert_profile(user.id, user.email, (user.user_metadata or {}).get("name", "") or "", "", "supabase")
-        return {
-            "access_token": sess.access_token,
-            "refresh_token": sess.refresh_token,
-            "user": {
-                "id": user.id, "email": user.email,
-                "name": (user.user_metadata or {}).get("name", "") or "",
-                "is_admin": is_admin_email(user.email),
-            },
-        }
-    except Exception:
+        res = sb_auth.auth.sign_in_with_password({"email": body.email, "password": body.password})
+    except Exception as e:
+        log.info("login failed for %s: %s", body.email, e)
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    sess = res.session
+    user = res.user
+    if not sess or not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # Ensure profile exists (only inserts on first login if signup didn't run via our /signup)
+    name = (user.user_metadata or {}).get("name", "") or ""
+    await ensure_profile(user.id, user.email, name, "", "supabase")
+    return {
+        "access_token": sess.access_token,
+        "refresh_token": sess.refresh_token,
+        "user": {
+            "id": user.id, "email": user.email,
+            "name": name,
+            "is_admin": is_admin_email(user.email),
+        },
+    }
 
 
 # ---------- Routes: Emergent Google OAuth ----------
@@ -281,8 +306,8 @@ async def emergent_callback(body: EmergentCallbackIn, response: Response):
     # Use Emergent's `id` as our profile id (deterministic per email)
     user_id = data.get("id") or f"emg_{uuid.uuid4().hex[:12]}"
 
-    # Upsert profile
-    await upsert_profile(user_id, email, name, picture, "emergent")
+    # Upsert profile (use service-role client which is never auth-mutated)
+    await ensure_profile(user_id, email, name, picture, "emergent")
 
     # Store session (7 days)
     expires_at = datetime.now(timezone.utc) + timedelta(days=7)
