@@ -1,0 +1,52 @@
+{
+  "summary": "Tested CorteQS Diaspora Globe full-stack. 6/13 backend tests pass (3 skipped due to chained failures). Public APIs work (health, /pins returns 25 approved pins, /geocode, /auth/me 401, /auth/logout, signup). CRITICAL: every authenticated endpoint (login, /auth/me with token, POST /pins, /pins/admin, PATCH /pins) returns 500/401 due to Supabase RLS policy violation on `profiles` table when current_user() upserts the profile. This blocks login, pin creation, and the entire admin flow. Frontend renders the 3D globe, search bar, filter rail, FAB, auth modal correctly, but pin count shows 0 in the rail/footer (possible delayed render or pins not propagating into state visibly). Google OAuth not tested (browser-redirect, not safe in headless).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/auth/me (with Bearer token)", "issue": "Returns 500. RLS error: 'new row violates row-level security policy for table profiles' from upsert_profile() in current_user(). Service role client does not bypass RLS — likely the table has FORCE ROW LEVEL SECURITY or service_role policies are missing in supabase_setup.sql.", "priority": "CRITICAL"},
+      {"endpoint": "POST /api/auth/login", "issue": "Returns 401 'Invalid credentials' even for the freshly-signed-up valid user. Root cause: login() upserts profile after sign_in_with_password and the broad `except Exception` swallows the RLS error, masquerading it as 401. Two bugs combined: (a) RLS upsert failure, (b) overly broad except that misclassifies all errors as bad creds.", "priority": "CRITICAL"},
+      {"endpoint": "POST /api/pins (auth)", "issue": "Returns 500 — same RLS error in current_user → upsert_profile chain.", "priority": "CRITICAL"},
+      {"endpoint": "GET /api/pins/admin", "issue": "Returns 500 instead of 403 when non-admin user calls — same RLS upsert blocks before role check runs.", "priority": "HIGH"},
+      {"endpoint": "PATCH /api/pins/{id} (no admin)", "issue": "Same — would 500 instead of 403 because current_user fails first.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/auth/login", "issue": "Catches all exceptions and returns 401. Should at least log + reraise non-auth errors as 500 with detail."},
+      {"endpoint": "current_user()", "issue": "Calls upsert_profile on every authenticated request. Even after RLS fix this is wasteful — profile already exists post-signup. Should only upsert if profile not found."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "DiasporaGlobe / FilterRail", "issue": "Filter chip 'Hepsi' shows count 0 and footer shows '0 pin · tüm kategoriler' on initial load even though /api/pins returns 25 pins. No pin emojis visible on the globe in screenshot. Need to verify whether pins eventually render (possible async timing) or if there is a state propagation bug.", "selector": "[data-testid='filter-all'], [data-testid='footer-info']", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Signup → user chip", "issue": "Could not test end-to-end via UI because backend signupEmail succeeds but immediate refresh()→/auth/me fails with 500 (RLS). User would remain logged-out visually after signup.", "affected_selectors": ["[data-testid='user-chip']"]}
+    ],
+    "design_issues": [
+      {"screen": "Main screen", "issues": ["Visually clean — globe, search, filter rail, FAB layout look good. Turkish copy correct. No major design issues observed."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "FIX RLS for service_role on `profiles` table — update /app/backend/supabase_setup.sql to grant service_role full access OR disable FORCE RLS. Service role is supposed to bypass RLS but the current policies on profiles block UPSERT. Add policy: `CREATE POLICY \"service_role full access\" ON profiles FOR ALL TO service_role USING (true) WITH CHECK (true);` OR better, ensure `ALTER TABLE profiles FORCE ROW LEVEL SECURITY` is NOT used.",
+    "ALTERNATIVE FIX (code-side): change current_user() to only call upsert_profile when profile does not already exist (SELECT first). Profile is already created at signup/login, so per-request upsert is unnecessary. This avoids the RLS write path on every request.",
+    "Fix login() error handling — don't catch all exceptions as 401. Catch supabase.AuthApiError specifically; let other errors propagate as 500.",
+    "Investigate frontend pin count showing 0 while backend returns 25 — verify api.get('/pins') in App.loadPins, check Network tab, and check whether setPins is being called.",
+    "After RLS fix, retest admin flow: append test user email to ADMIN_EMAILS in /app/backend/.env, restart backend, login again, hit /api/pins/admin, PATCH and DELETE.",
+    "Save test credentials to /app/memory/test_credentials.md once auth is unblocked."
+  ],
+  "critical_code_review_comments": [
+    "server.py current_user(): unconditional upsert_profile on every request — both a perf concern and the cause of the RLS 500s. Should be read-only or upsert-on-miss.",
+    "server.py login(): bare `except Exception` masks all errors as 'Invalid credentials' — bad UX/debug.",
+    "server.py: SUPABASE_SERVICE_ROLE_KEY is read at module import via os.environ[...] (KeyError on missing) — OK but no graceful fail message.",
+    "supabase_setup.sql not reviewed (file referenced but RLS policies appear too restrictive).",
+    "AuthContext.signupEmail: relies on backend to return access_token+refresh_token then sets supabase session client-side — works only if signup endpoint succeeds; refresh() afterwards will currently fail (500) due to RLS.",
+    "logout sets samesite='none' + secure=True — requires HTTPS (OK in prod preview)."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "46% (6/13 passed, 4 failed, 3 skipped)", "frontend": "Smoke OK; pin rendering count discrepancy not root-caused"},
+  "test_credentials": "Created during this run: testdiaspora_<TS>@example.com / test123456 (signup succeeded, but login currently fails due to RLS bug — credentials not yet usable). Did NOT update /app/memory/test_credentials.md because the user is not currently usable.",
+  "seed_data_creation": "Confirmed 25 sample pins already seeded and visible via GET /api/pins. No new seed data created.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "After main agent fixes the RLS issue (either via SQL policy update for service_role OR by removing the per-request upsert in current_user), re-run /app/backend/tests/backend_test.py — all 13 tests should pass except the admin-positive flow which requires editing ADMIN_EMAILS. The critical path to verify: POST /auth/login returns 200 with token, GET /auth/me with Bearer returns user, POST /pins returns 200 pending pin, GET /pins/admin without admin returns 403 (not 500). Then run frontend Playwright to verify signup → user-chip appears → Pin ekle → AddPinModal → submit → toast.",
+  "rca_of_the_issue": "RCA: Backend log shows postgrest APIError code 42501 ('new row violates row-level security policy for table \"profiles\"') on every upsert. The service role client (sb=create_client(URL, SERVICE_ROLE_KEY)) is correctly initialized but the Supabase project's RLS policies on `profiles` are not allowing service_role writes. Reproduction: signup the test user → call GET /api/pins/mine with the returned access_token → 500. Mitigation: (a) add a service_role bypass policy to profiles in supabase_setup.sql and re-run in Supabase SQL Editor, OR (b) refactor current_user() to skip upsert when profile already exists. Login's broad except converts the 500 to 401, masking the real bug — fix the except too."
+}
