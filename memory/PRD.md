@@ -36,6 +36,8 @@ Reference doc: `CorteQS Diaspora Globe.md` (uploaded by user).
 - ✅ Pin moderation flow (status pending|approved|rejected) + admin panel `/admin`
 - ✅ Geocoding proxy with API key kept server-side
 - ✅ Sample seed of 25 pins (Berlin/Istanbul/Paris/London/Amsterdam/...)
+- ✅ **Supabase Realtime** (P1 done): live INSERT/UPDATE/DELETE broadcast → globe auto-updates in <1s
+- ✅ **Wow arrival effect**: 3-stage expanding rings + bouncy scale-in emoji + glow + toast notification when a pin is approved/inserted
 
 ## Pending User Action
 - 🟡 **Run `/app/backend/supabase_setup.sql` in Supabase SQL Editor** (one-time DDL — no other path possible without DB password)
