@@ -79,10 +79,13 @@ export default function DiasporaGlobe({
 
   useEffect(() => { filterRef.current = filter; }, [filter]);
 
-  // Clusters depend on pins, filter, zoom
+  // Clusters depend on pins, filter, zoom — radius shrinks aggressively as user zooms in
   const clusters = useMemo(() => {
     const visible = (filter && filter !== "all") ? pins.filter((p) => p.type === filter) : pins;
-    const radius = clamp(zoomZ * 1.6, 1.5, 16);
+    // z range: 1.25 (max zoom in) → 5.5 (max zoom out)
+    // radius range: 0.02° (separates pins ~2km apart) → 12° (clusters whole continents)
+    const t = (zoomZ - 1.25) / (5.5 - 1.25);   // 0..1
+    const radius = 0.02 + Math.pow(clamp(t, 0, 1), 1.4) * 12;
     return clusterPins(visible, radius);
   }, [pins, filter, zoomZ]);
 
@@ -407,11 +410,24 @@ export default function DiasporaGlobe({
   const onClusterClick = (c) => {
     if (c.pins.length === 1) {
       onPinClick?.(c.pins[0]);
-    } else {
-      // Zoom into cluster
-      const targetZ = clamp(zoomZ - 1.2, 1.45, 5.5);
-      flyTo({ lat: c.lat, lng: c.lng }, targetZ);
+      return;
     }
+    // Compute spread → choose zoom level that will guarantee cluster expands
+    const lats = c.pins.map((p) => p.lat);
+    const lngs = c.pins.map((p) => p.lng);
+    const spread = Math.max(
+      Math.max(...lats) - Math.min(...lats),
+      Math.max(...lngs) - Math.min(...lngs),
+      0.05
+    );
+    // Reverse cluster radius formula: r = 0.02 + t^1.4 * 12 → t = ((r-0.02)/12)^(1/1.4)
+    // We want r ≈ spread * 0.4 so cluster breaks
+    const desiredR = Math.max(0.05, spread * 0.4);
+    const t = Math.pow(Math.max(0, (desiredR - 0.02) / 12), 1 / 1.4);
+    const targetZ = clamp(1.25 + t * (5.5 - 1.25), 1.25, 4.5);
+    // Always move closer than current
+    const currentZ = threeRef.current?.camera?.position?.z ?? zoomZ;
+    flyTo({ lat: c.lat, lng: c.lng }, Math.min(targetZ, currentZ * 0.6));
   };
 
   return (
