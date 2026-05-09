@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import DiasporaGlobe from "@/components/DiasporaGlobe";
 import SearchBar from "@/components/SearchBar";
@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Plus, LogOut, Shield, Globe2 } from "lucide-react";
 import { PIN_TYPES } from "@/lib/pinTypes";
 import api from "@/lib/api";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 import "@/App.css";
 
 function MainScreen() {
@@ -23,11 +25,30 @@ function MainScreen() {
   const [searchQuery, setSearchQuery] = useState(null);
   const [searchTrigger, setSearchTrigger] = useState(0);
   const [flyToCoords, setFlyToCoords] = useState(null);
+  const [arrivedIds, setArrivedIds] = useState(new Set()); // pins that just arrived via realtime — get wow effect
+  const arrivedTimers = useRef({});
 
   const [authOpen, setAuthOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [pendingCoords, setPendingCoords] = useState(null);
   const [addMode, setAddMode] = useState(false); // when true, next globe click opens add-pin
+
+  const markArrived = useCallback((id) => {
+    setArrivedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    if (arrivedTimers.current[id]) clearTimeout(arrivedTimers.current[id]);
+    arrivedTimers.current[id] = setTimeout(() => {
+      setArrivedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      delete arrivedTimers.current[id];
+    }, 5000);
+  }, []);
 
   const loadPins = useCallback(async () => {
     try {
@@ -37,6 +58,49 @@ function MainScreen() {
   }, []);
 
   useEffect(() => { loadPins(); }, [loadPins]);
+
+  // ----- Realtime subscription: live updates when pins are inserted/approved/rejected/deleted -----
+  useEffect(() => {
+    const channel = supabase
+      .channel("pins-live")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "pins" }, (payload) => {
+        const p = payload.new;
+        if (p?.status !== "approved") return;
+        setPins((prev) => (prev.find((x) => x.id === p.id) ? prev : [p, ...prev]));
+        markArrived(p.id);
+        const t = PIN_TYPES[p.type];
+        if (t) toast(`${t.emoji} Yeni pin: ${p.name} · ${p.city}`);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "pins" }, (payload) => {
+        const np = payload.new;
+        const op = payload.old || {};
+        if (!np) return;
+        if (np.status === "approved" && op.status !== "approved") {
+          // Newly approved → arrive
+          setPins((prev) => (prev.find((x) => x.id === np.id) ? prev.map((x) => x.id === np.id ? np : x) : [np, ...prev]));
+          markArrived(np.id);
+          const t = PIN_TYPES[np.type];
+          if (t) toast(`${t.emoji} Onaylandı: ${np.name} · ${np.city}`);
+        } else if (np.status !== "approved" && op.status === "approved") {
+          // Approved → moved to pending/rejected → remove
+          setPins((prev) => prev.filter((x) => x.id !== np.id));
+        } else if (np.status === "approved") {
+          // Edited approved row
+          setPins((prev) => prev.map((x) => x.id === np.id ? np : x));
+        }
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "pins" }, (payload) => {
+        const id = payload.old?.id;
+        if (id) setPins((prev) => prev.filter((x) => x.id !== id));
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      Object.values(arrivedTimers.current).forEach(clearTimeout);
+      arrivedTimers.current = {};
+    };
+  }, [markArrived]);
 
   // Auto-seed if globe is empty and user is admin (handy for first-run)
   useEffect(() => {
@@ -87,6 +151,7 @@ function MainScreen() {
       <DiasporaGlobe
         pins={pins}
         filter={filter}
+        arrivedIds={arrivedIds}
         onPinClick={onPinClick}
         onGlobeClick={onGlobeClick}
         searchQuery={searchQuery}

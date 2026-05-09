@@ -42,3 +42,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user ON public.user_sessions(user_id);
 ALTER TABLE public.profiles      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pins          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_sessions ENABLE ROW LEVEL SECURITY;
+
+-- ============ realtime ============
+-- Enable Supabase Realtime on the pins table so frontend can listen to live INSERT/UPDATE/DELETE.
+ALTER PUBLICATION supabase_realtime ADD TABLE public.pins;

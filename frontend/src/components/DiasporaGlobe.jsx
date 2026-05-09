@@ -23,6 +23,7 @@ function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 export default function DiasporaGlobe({
   pins,
   filter,
+  arrivedIds,
   onPinClick,
   onGlobeClick,
   searchQuery,        // string to fly to (city dict or geocoded result)
@@ -433,22 +434,30 @@ export default function DiasporaGlobe({
       {pins.map((p) => {
         const t = PIN_TYPES[p.type] || PIN_TYPES.person;
         const isEvent = p.type === "event";
+        const isArrived = arrivedIds && arrivedIds.has(p.id);
         return (
           <div
             key={p.id}
             ref={(el) => { if (el) pinRefs.current[p.id] = el; }}
             data-testid={`pin-${p.id}`}
-            className="globe-pin"
-            style={{ borderColor: t.color, color: t.color }}
+            className={`globe-pin ${isArrived ? "pin-arrived" : ""}`}
+            style={{ borderColor: t.color, color: t.color, "--pin-color": t.color }}
             onClick={(e) => { e.stopPropagation(); onPinClick?.(p); }}
           >
-            {isEvent && (
+            {(isEvent || isArrived) && (
               <>
                 <span className="pulse" style={{ background: t.color }} />
                 <span className="pulse" style={{ background: t.color, animationDelay: "0.7s" }} />
               </>
             )}
-            <span className={`pin-emoji ${isEvent ? "blink" : ""}`}>{t.emoji}</span>
+            {isArrived && (
+              <>
+                <span className="arrive-ring" style={{ borderColor: t.color }} />
+                <span className="arrive-ring" style={{ borderColor: t.color, animationDelay: "0.6s" }} />
+                <span className="arrive-ring" style={{ borderColor: t.color, animationDelay: "1.2s" }} />
+              </>
+            )}
+            <span className={`pin-emoji ${isEvent ? "blink" : ""} ${isArrived ? "arriving" : ""}`}>{t.emoji}</span>
           </div>
         );
       })}
