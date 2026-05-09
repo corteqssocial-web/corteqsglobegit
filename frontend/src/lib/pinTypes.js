@@ -1,0 +1,42 @@
+// Pin type definitions — used by both Globe and modals
+export const PIN_TYPES = {
+  person:   { emoji: "❤️",  label: "Diaspora Üyesi",   color: "#ff6b9d" },
+  business: { emoji: "🏪",  label: "İşletme",          color: "#ffd166" },
+  ngo:      { emoji: "🤝",  label: "STK / Dernek",     color: "#06d6a0" },
+  creator:  { emoji: "🎥",  label: "İçerik Üreticisi", color: "#a78bfa" },
+  event:    { emoji: "⚡",  label: "Aktif Etkinlik",   color: "#fdcb6e" },
+};
+
+// Static city dictionary — lookup is instant. Free-text falls back to /api/geocode.
+export const CITIES = {
+  "berlin":     { lat: 52.52,  lng: 13.41 },
+  "istanbul":   { lat: 41.01,  lng: 28.96 },
+  "ankara":     { lat: 39.93,  lng: 32.85 },
+  "izmir":      { lat: 38.42,  lng: 27.14 },
+  "london":     { lat: 51.50,  lng: -0.12 },
+  "paris":      { lat: 48.86,  lng: 2.35  },
+  "amsterdam":  { lat: 52.37,  lng: 4.90  },
+  "rotterdam":  { lat: 51.92,  lng: 4.48  },
+  "brussels":   { lat: 50.85,  lng: 4.35  },
+  "vienna":     { lat: 48.21,  lng: 16.37 },
+  "frankfurt":  { lat: 50.11,  lng: 8.68  },
+  "munich":     { lat: 48.14,  lng: 11.58 },
+  "hamburg":    { lat: 53.55,  lng: 10.00 },
+  "stockholm":  { lat: 59.33,  lng: 18.07 },
+  "oslo":       { lat: 59.91,  lng: 10.75 },
+  "copenhagen": { lat: 55.68,  lng: 12.57 },
+  "helsinki":   { lat: 60.17,  lng: 24.94 },
+  "madrid":     { lat: 40.42,  lng: -3.70 },
+  "barcelona":  { lat: 41.39,  lng: 2.17  },
+  "lisbon":     { lat: 38.72,  lng: -9.14 },
+  "rome":       { lat: 41.90,  lng: 12.50 },
+  "athens":     { lat: 37.98,  lng: 23.73 },
+  "new york":   { lat: 40.71,  lng: -74.01 },
+  "los angeles":{ lat: 34.05,  lng: -118.24 },
+  "toronto":    { lat: 43.65,  lng: -79.38 },
+  "sydney":     { lat: -33.87, lng: 151.21 },
+  "tokyo":      { lat: 35.68,  lng: 139.69 },
+  "dubai":      { lat: 25.20,  lng: 55.27 },
+  "cairo":      { lat: 30.04,  lng: 31.24 },
+  "sao paulo":  { lat: -23.55, lng: -46.63 },
+};
