@@ -36,8 +36,14 @@ Reference doc: `CorteQS Diaspora Globe.md` (uploaded by user).
 - ✅ Pin moderation flow (status pending|approved|rejected) + admin panel `/admin`
 - ✅ Geocoding proxy with API key kept server-side
 - ✅ Sample seed of 25 pins (Berlin/Istanbul/Paris/London/Amsterdam/...)
-- ✅ **Supabase Realtime** (P1 done): live INSERT/UPDATE/DELETE broadcast → globe auto-updates in <1s
-- ✅ **Wow arrival effect**: 3-stage expanding rings + bouncy scale-in emoji + glow + toast notification when a pin is approved/inserted
+- ✅ **Supabase Realtime**: live INSERT/UPDATE/DELETE broadcast → globe auto-updates in <1s
+- ✅ **Wow arrival effect**: 3-stage expanding rings + bouncy scale-in emoji + glow + toast notification
+- ✅ **Pin image upload** (Supabase Storage, public bucket `pin-images`, 4MB limit, jpg/png/webp/gif) — backend route `/api/upload/pin-image`
+- ✅ **Pin description** (textarea, 500 char) stored in `pins.description`
+- ✅ **PinDetailDrawer** — shadcn Sheet (right side), shows image header (or gradient+emoji fallback), name, type badge, hood/city, lat/lng, created date, status badge if pending, "Buraya yakınlaş" CTA
+- ✅ **Cluster system** — adaptive lat/lng clustering with zoom-aware radius (poll camera.z @ 250ms, useMemo clusters). Single-pin clusters render as normal pin; multi-pin renders as cluster bubble (count + top-3 emoji mix + pulsing ring). Click cluster → fly-to + zoom in (~1.2 z reduction).
+- ✅ **Personalized "Onaylandı 🎉" toast + auto-fly-to** when current user's own pending pin is approved (Realtime UPDATE event match `new.user_id === currentUser.id`)
+- ✅ **Geo-IP initial fly-to** — `/api/geoip` (ip-api.com proxy) returns user's country/city + lat/lng → auto fly-to ~1.2s after page load with city toast
 
 ## Pending User Action
 - 🟡 **Run `/app/backend/supabase_setup.sql` in Supabase SQL Editor** (one-time DDL — no other path possible without DB password)
