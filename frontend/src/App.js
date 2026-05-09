@@ -6,6 +6,7 @@ import AuthModal from "@/components/AuthModal";
 import AuthCallback from "@/components/AuthCallback";
 import AddPinModal from "@/components/AddPinModal";
 import AdminPanel from "@/components/AdminPanel";
+import PinDetailDrawer from "@/components/PinDetailDrawer";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,10 @@ function MainScreen() {
   const [addOpen, setAddOpen] = useState(false);
   const [pendingCoords, setPendingCoords] = useState(null);
   const [addMode, setAddMode] = useState(false); // when true, next globe click opens add-pin
+  const [drawerPin, setDrawerPin] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const userRef = useRef(null);
+  useEffect(() => { userRef.current = user; }, [user]);
 
   const markArrived = useCallback((id) => {
     setArrivedIds((prev) => {
@@ -76,16 +81,21 @@ function MainScreen() {
         const op = payload.old || {};
         if (!np) return;
         if (np.status === "approved" && op.status !== "approved") {
-          // Newly approved → arrive
           setPins((prev) => (prev.find((x) => x.id === np.id) ? prev.map((x) => x.id === np.id ? np : x) : [np, ...prev]));
           markArrived(np.id);
           const t = PIN_TYPES[np.type];
-          if (t) toast(`${t.emoji} Onaylandı: ${np.name} · ${np.city}`);
+          // Personalized: if it's the current user's own pin → celebratory toast + fly-to
+          const me = userRef.current;
+          if (me && np.user_id === me.id) {
+            toast.success(`🎉 Pin'in onaylandı: ${np.name}`, { duration: 6000 });
+            setFlyToCoords({ lat: np.lat, lng: np.lng, zoom: 1.7 });
+            setSearchTrigger((x) => x + 1);
+          } else if (t) {
+            toast(`${t.emoji} Onaylandı: ${np.name} · ${np.city}`);
+          }
         } else if (np.status !== "approved" && op.status === "approved") {
-          // Approved → moved to pending/rejected → remove
           setPins((prev) => prev.filter((x) => x.id !== np.id));
         } else if (np.status === "approved") {
-          // Edited approved row
           setPins((prev) => prev.map((x) => x.id === np.id ? np : x));
         }
       })
@@ -129,8 +139,30 @@ function MainScreen() {
   }, [addMode, user]);
 
   const onPinClick = useCallback((p) => {
-    setFlyToCoords({ lat: p.lat, lng: p.lng });
-    setSearchTrigger((x) => x + 1);
+    setDrawerPin(p);
+    setDrawerOpen(true);
+  }, []);
+
+  // Geo-IP initial fly-to (once on first mount, only if no manual interaction yet)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get("/geoip");
+        if (cancelled) return;
+        const { lat, lng, city, country_name } = res.data || {};
+        if (lat != null && lng != null) {
+          // Defer briefly so Three.js initial setup is ready
+          setTimeout(() => {
+            if (cancelled) return;
+            setFlyToCoords({ lat, lng });
+            setSearchTrigger((x) => x + 1);
+            if (city) toast(`🌍 ${city}${country_name ? `, ${country_name}` : ""}`, { duration: 3000 });
+          }, 1200);
+        }
+      } catch { /* silent */ }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   const counts = useMemo(() => {
@@ -256,6 +288,16 @@ function MainScreen() {
         lat={pendingCoords?.lat}
         lng={pendingCoords?.lng}
         onCreated={() => loadPins()}
+      />
+      <PinDetailDrawer
+        pin={drawerPin}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        onFlyTo={(p) => {
+          setFlyToCoords({ lat: p.lat, lng: p.lng, zoom: 1.7 });
+          setSearchTrigger((x) => x + 1);
+          setDrawerOpen(false);
+        }}
       />
 
       <Toaster

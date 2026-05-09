@@ -20,22 +20,49 @@ function toScreen(world, camera, w, h) {
 function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
+// ---------- Clustering ----------
+function clusterPins(pins, radiusDeg) {
+  const clusters = [];
+  for (const p of pins) {
+    let added = false;
+    for (const c of clusters) {
+      const dlat = p.lat - c.lat;
+      let dlng = p.lng - c.lng;
+      while (dlng > 180) dlng -= 360;
+      while (dlng < -180) dlng += 360;
+      const lngScale = Math.max(0.3, Math.cos((c.lat * Math.PI) / 180));
+      if (Math.abs(dlat) < radiusDeg && Math.abs(dlng) * lngScale < radiusDeg) {
+        c.pins.push(p);
+        c.lat = c.pins.reduce((s, x) => s + x.lat, 0) / c.pins.length;
+        c.lng = c.pins.reduce((s, x) => s + x.lng, 0) / c.pins.length;
+        added = true;
+        break;
+      }
+    }
+    if (!added) clusters.push({ pins: [p], lat: p.lat, lng: p.lng });
+  }
+  return clusters.map((c) => ({
+    ...c,
+    id: c.pins.length === 1 ? `p_${c.pins[0].id}` : `c_${c.pins.map((x) => x.id).slice(0, 4).join("_")}`,
+  }));
+}
+
 export default function DiasporaGlobe({
   pins,
   filter,
   arrivedIds,
   onPinClick,
   onGlobeClick,
-  searchQuery,        // string to fly to (city dict or geocoded result)
-  searchTrigger,      // increments when search triggered
-  flyToCoords,        // optional {lat,lng} override
+  searchQuery,
+  searchTrigger,
+  flyToCoords,
 }) {
   const mountRef = useRef(null);
-  const pinRefs = useRef({});
+  const overlayRefs = useRef({});      // keyed by cluster.id
   const threeRef = useRef({});
   const sizeRef = useRef({ W: 0, H: 0 });
   const filterRef = useRef(filter);
-  const pinsRef = useRef(pins);
+  const clustersRef = useRef([]);
   const autoRotate = useRef(true);
   const dragTimer = useRef(null);
   const isDragging = useRef(false);
@@ -48,73 +75,55 @@ export default function DiasporaGlobe({
 
   const [hovered, setHovered] = useState(null);
   const [notFound, setNotFound] = useState(false);
+  const [zoomZ, setZoomZ] = useState(2.8);
 
-  // Keep refs in sync
   useEffect(() => { filterRef.current = filter; }, [filter]);
-  useEffect(() => { pinsRef.current = pins; }, [pins]);
+
+  // Clusters depend on pins, filter, zoom
+  const clusters = useMemo(() => {
+    const visible = (filter && filter !== "all") ? pins.filter((p) => p.type === filter) : pins;
+    const radius = clamp(zoomZ * 1.6, 1.5, 16);
+    return clusterPins(visible, radius);
+  }, [pins, filter, zoomZ]);
+
+  useEffect(() => { clustersRef.current = clusters; }, [clusters]);
 
   // ----- Three.js init (mount once) -----
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
-
-    const W = mount.clientWidth;
-    const H = mount.clientHeight;
+    const W = mount.clientWidth, H = mount.clientHeight;
     sizeRef.current = { W, H };
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 100);
     camera.position.z = 2.8;
-
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(W, H);
     renderer.setClearColor(0x000000, 0);
     mount.appendChild(renderer.domElement);
 
-    // Globe group
     const globe = new THREE.Group();
     scene.add(globe);
 
-    // Earth
-    const earthMat = new THREE.MeshPhongMaterial({
-      color: 0x1a3d78,
-      shininess: 18,
-      specular: 0x222244,
-    });
+    const earthMat = new THREE.MeshPhongMaterial({ color: 0x1a3d78, shininess: 18, specular: 0x222244 });
     const earthMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 64), earthMat);
     globe.add(earthMesh);
 
-    // Texture (NASA Blue Marble) — async load
     new THREE.TextureLoader().load(
       "https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg",
-      (tex) => {
-        earthMat.map = tex;
-        earthMat.color = new THREE.Color(0xffffff);
-        earthMat.needsUpdate = true;
-      },
-      undefined,
-      () => {}
+      (tex) => { earthMat.map = tex; earthMat.color = new THREE.Color(0xffffff); earthMat.needsUpdate = true; },
+      undefined, () => {}
     );
 
-    // Atmosphere + glow layers
-    const atmosMesh = new THREE.Mesh(
-      new THREE.SphereGeometry(1.025, 64, 64),
-      new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.08, side: THREE.FrontSide })
-    );
-    globe.add(atmosMesh);
-    const glow1 = new THREE.Mesh(
-      new THREE.SphereGeometry(1.20, 32, 32),
-      new THREE.MeshBasicMaterial({ color: 0x3366ff, transparent: true, opacity: 0.055, side: THREE.BackSide })
-    );
-    globe.add(glow1);
-    const glow2 = new THREE.Mesh(
-      new THREE.SphereGeometry(1.40, 32, 32),
-      new THREE.MeshBasicMaterial({ color: 0x3366ff, transparent: true, opacity: 0.025, side: THREE.BackSide })
-    );
-    globe.add(glow2);
+    globe.add(new THREE.Mesh(new THREE.SphereGeometry(1.025, 64, 64),
+      new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.08, side: THREE.FrontSide })));
+    globe.add(new THREE.Mesh(new THREE.SphereGeometry(1.20, 32, 32),
+      new THREE.MeshBasicMaterial({ color: 0x3366ff, transparent: true, opacity: 0.055, side: THREE.BackSide })));
+    globe.add(new THREE.Mesh(new THREE.SphereGeometry(1.40, 32, 32),
+      new THREE.MeshBasicMaterial({ color: 0x3366ff, transparent: true, opacity: 0.025, side: THREE.BackSide })));
 
-    // Stars
     const makeStars = (count, size, range) => {
       const positions = new Float32Array(count * 3);
       for (let i = 0; i < count; i++) {
@@ -130,55 +139,40 @@ export default function DiasporaGlobe({
     scene.add(makeStars(3000, 0.10, 60));
     scene.add(makeStars(500, 0.20, 60));
 
-    // Lights
     scene.add(new THREE.AmbientLight(0x334466, 0.9));
     const sun = new THREE.DirectionalLight(0xffffff, 1.1); sun.position.set(5, 3, 5); scene.add(sun);
     const rim = new THREE.DirectionalLight(0x3366ff, 0.3); rim.position.set(-6, 1, -4); scene.add(rim);
 
-    // Pin hitboxes (rebuilt when pins change — see effect below)
-    const pinMeshes = [];
-
-    // Raycaster
+    const overlayMeshes = []; // one per cluster
     const raycaster = new THREE.Raycaster();
+    threeRef.current = { scene, camera, renderer, globe, earthMat, earthMesh, overlayMeshes, raycaster };
 
-    threeRef.current = {
-      scene, camera, renderer, globe, earthMat, earthMesh, pinMeshes, raycaster,
-    };
-
-    // Animation loop
     const worldPos = new THREE.Vector3();
     let raf = 0;
     const tick = () => {
       raf = requestAnimationFrame(tick);
       if (autoRotate.current) globe.rotation.y += 0.0018;
 
-      // Pin DOM positioning
       const { W, H } = sizeRef.current;
-      pinMeshes.forEach((mesh) => {
-        const pinId = mesh.userData.pinId;
-        const domEl = pinRefs.current[pinId];
-        if (!domEl) return;
-        const pin = pinsRef.current.find((p) => p.id === pinId);
-        if (!pin) return;
-        const visibleByFilter = !filterRef.current || filterRef.current === "all" || filterRef.current === pin.type;
-
+      overlayMeshes.forEach((mesh) => {
+        const cid = mesh.userData.clusterId;
+        const dom = overlayRefs.current[cid];
+        if (!dom) return;
         mesh.getWorldPosition(worldPos);
         const sc = toScreen(worldPos, camera, W, H);
         const isVisible = worldPos.z > -0.05;
-        const alpha = visibleByFilter && isVisible ? clamp(worldPos.z * 1.8, 0, 1) : 0;
-
-        domEl.style.left = sc.x + "px";
-        domEl.style.top = sc.y + "px";
-        domEl.style.opacity = alpha.toFixed(3);
-        domEl.style.pointerEvents = alpha > 0.3 ? "auto" : "none";
+        const alpha = isVisible ? clamp(worldPos.z * 1.8, 0, 1) : 0;
+        dom.style.left = sc.x + "px";
+        dom.style.top = sc.y + "px";
+        dom.style.opacity = alpha.toFixed(3);
+        dom.style.pointerEvents = alpha > 0.3 ? "auto" : "none";
         mesh.visible = alpha > 0.05;
       });
 
-      // Hover detection (only when not dragging)
-      if (!isDragging.current && pinMeshes.length > 0) {
+      if (!isDragging.current && overlayMeshes.length > 0) {
         raycaster.setFromCamera(mouseNDC.current, camera);
-        const hits = raycaster.intersectObjects(pinMeshes);
-        const newHover = hits.length ? hits[0].object.userData.pinId : null;
+        const hits = raycaster.intersectObjects(overlayMeshes);
+        const newHover = hits.length ? hits[0].object.userData.clusterId : null;
         if (newHover !== prevHover.current) {
           prevHover.current = newHover;
           setHovered(newHover);
@@ -189,13 +183,10 @@ export default function DiasporaGlobe({
     };
     tick();
 
-    // Resize
     const onResize = () => {
       const w = mount.clientWidth, h = mount.clientHeight;
       sizeRef.current = { W: w, H: h };
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
+      camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h);
     };
     window.addEventListener("resize", onResize);
 
@@ -210,29 +201,34 @@ export default function DiasporaGlobe({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ----- Rebuild pin hitboxes when `pins` array changes -----
+  // ----- Rebuild cluster hitboxes when `clusters` change -----
   useEffect(() => {
     const t = threeRef.current;
     if (!t.globe) return;
-    // Remove old
-    t.pinMeshes.forEach((m) => {
-      t.globe.remove(m);
-      m.geometry.dispose();
-      m.material.dispose();
+    t.overlayMeshes.forEach((m) => {
+      t.globe.remove(m); m.geometry.dispose(); m.material.dispose();
     });
-    t.pinMeshes.length = 0;
-    // Add new
+    t.overlayMeshes.length = 0;
     const hitGeom = new THREE.SphereGeometry(0.04, 8, 8);
     const hitMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 });
-    pins.forEach((p) => {
-      const pos = latLngTo3D(p.lat, p.lng, GLOBE_RADIUS * 1.015);
+    clusters.forEach((c) => {
+      const pos = latLngTo3D(c.lat, c.lng, GLOBE_RADIUS * 1.015);
       const m = new THREE.Mesh(hitGeom, hitMat.clone());
       m.position.copy(pos);
-      m.userData.pinId = p.id;
+      m.userData.clusterId = c.id;
       t.globe.add(m);
-      t.pinMeshes.push(m);
+      t.overlayMeshes.push(m);
     });
-  }, [pins]);
+  }, [clusters]);
+
+  // ----- Zoom polling -----
+  useEffect(() => {
+    const id = setInterval(() => {
+      const z = threeRef.current?.camera?.position?.z;
+      if (z != null && Math.abs(z - zoomZ) > 0.08) setZoomZ(z);
+    }, 250);
+    return () => clearInterval(id);
+  }, [zoomZ]);
 
   // ----- Mouse / touch interaction -----
   useEffect(() => {
@@ -244,19 +240,14 @@ export default function DiasporaGlobe({
       mouseNDC.current.x = ((clientX - rect.left) / rect.width) * 2 - 1;
       mouseNDC.current.y = -((clientY - rect.top) / rect.height) * 2 + 1;
     };
-
-    const beginInteract = () => {
-      autoRotate.current = false;
-      if (dragTimer.current) clearTimeout(dragTimer.current);
-    };
+    const beginInteract = () => { autoRotate.current = false; if (dragTimer.current) clearTimeout(dragTimer.current); };
     const endInteract = () => {
       if (dragTimer.current) clearTimeout(dragTimer.current);
       dragTimer.current = setTimeout(() => { autoRotate.current = true; }, 3500);
     };
 
     const onMouseDown = (e) => {
-      isDragging.current = true;
-      dragMoved.current = false;
+      isDragging.current = true; dragMoved.current = false;
       dragLast.current = { x: e.clientX, y: e.clientY };
       dragStart.current = { x: e.clientX, y: e.clientY };
       beginInteract();
@@ -273,18 +264,16 @@ export default function DiasporaGlobe({
       t.globe.rotation.x = clamp(t.globe.rotation.x + dy * 0.005, -1.3, 1.3);
       dragLast.current = { x: e.clientX, y: e.clientY };
     };
-    const onMouseUp = (e) => {
+    const onMouseUp = () => {
       const wasDragging = isDragging.current;
       isDragging.current = false;
       endInteract();
-      // Click on globe (no drag)? Trigger onGlobeClick with lat/lng
       if (wasDragging && !dragMoved.current && onGlobeClick) {
         const t = threeRef.current;
         if (!t.scene) return;
-        // If we hit a pin, ignore globe click (pin click handled separately)
         t.raycaster.setFromCamera(mouseNDC.current, t.camera);
-        const pinHits = t.raycaster.intersectObjects(t.pinMeshes);
-        if (pinHits.length > 0) return;
+        const hits = t.raycaster.intersectObjects(t.overlayMeshes);
+        if (hits.length > 0) return; // click on cluster handled by DOM
         const earthHits = t.raycaster.intersectObject(t.earthMesh);
         if (earthHits.length > 0) {
           const local = t.earthMesh.worldToLocal(earthHits[0].point.clone());
@@ -302,19 +291,16 @@ export default function DiasporaGlobe({
       beginInteract(); endInteract();
     };
 
-    // Touch
     const onTouchStart = (e) => {
       if (e.touches.length === 1) {
-        isDragging.current = true;
-        dragMoved.current = false;
+        isDragging.current = true; dragMoved.current = false;
         dragLast.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         beginInteract();
       } else if (e.touches.length === 2) {
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
-        pinchRef.current.active = true;
-        pinchRef.current.dist = Math.hypot(dx, dy);
+        pinchRef.current = { active: true, dist: Math.hypot(dx, dy) };
         beginInteract();
       }
     };
@@ -372,24 +358,20 @@ export default function DiasporaGlobe({
   }, [onGlobeClick]);
 
   // ----- Fly-to -----
-  const flyTo = useCallback((coords) => {
+  const flyTo = useCallback((coords, zoomTarget) => {
     const t = threeRef.current;
     if (!t.globe || !t.camera) return;
     autoRotate.current = false;
-
     const targetY = -coords.lng * (Math.PI / 180);
     const targetX = -coords.lat * (Math.PI / 180) * 0.4;
-
     let diffY = targetY - t.globe.rotation.y;
     while (diffY > Math.PI) diffY -= 2 * Math.PI;
     while (diffY < -Math.PI) diffY += 2 * Math.PI;
     const finalY = t.globe.rotation.y + diffY;
-
     const sy = t.globe.rotation.y;
     const sx = t.globe.rotation.x;
     const sz = t.camera.position.z;
-    const tz = Math.max(1.55, sz - 0.5);
-
+    const tz = zoomTarget != null ? clamp(zoomTarget, 1.25, 5.5) : Math.max(1.55, sz - 0.5);
     let p = 0;
     const fly = () => {
       p = Math.min(p + 0.025, 1);
@@ -406,68 +388,93 @@ export default function DiasporaGlobe({
     fly();
   }, []);
 
-  // External: searchQuery / flyToCoords trigger
   useEffect(() => {
     if (flyToCoords?.lat != null && flyToCoords?.lng != null) {
-      flyTo(flyToCoords);
+      flyTo(flyToCoords, flyToCoords.zoom);
       return;
     }
     if (!searchQuery) return;
     const key = String(searchQuery).trim().toLowerCase();
     const c = CITIES[key];
-    if (c) {
-      setNotFound(false);
-      flyTo(c);
-    } else {
-      setNotFound(true);
-      setTimeout(() => setNotFound(false), 800);
-    }
+    if (c) { setNotFound(false); flyTo(c); }
+    else { setNotFound(true); setTimeout(() => setNotFound(false), 800); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTrigger]);
+  }, [searchTrigger, flyToCoords]);
 
-  // Hovered pin tooltip
-  const hoveredPin = useMemo(() => pins.find((p) => p.id === hovered), [pins, hovered]);
+  // Hover tooltip target
+  const hoveredCluster = useMemo(() => clusters.find((c) => c.id === hovered), [clusters, hovered]);
+
+  const onClusterClick = (c) => {
+    if (c.pins.length === 1) {
+      onPinClick?.(c.pins[0]);
+    } else {
+      // Zoom into cluster
+      const targetZ = clamp(zoomZ - 1.2, 1.45, 5.5);
+      flyTo({ lat: c.lat, lng: c.lng }, targetZ);
+    }
+  };
 
   return (
     <div ref={mountRef} className="absolute inset-0 select-none" data-testid="globe-canvas-mount" style={{ touchAction: "none" }}>
-      {/* Pin DOM overlays */}
-      {pins.map((p) => {
-        const t = PIN_TYPES[p.type] || PIN_TYPES.person;
-        const isEvent = p.type === "event";
-        const isArrived = arrivedIds && arrivedIds.has(p.id);
+      {clusters.map((c) => {
+        if (c.pins.length === 1) {
+          const p = c.pins[0];
+          const t = PIN_TYPES[p.type] || PIN_TYPES.person;
+          const isEvent = p.type === "event";
+          const isArrived = arrivedIds && arrivedIds.has(p.id);
+          return (
+            <div
+              key={c.id}
+              ref={(el) => { if (el) overlayRefs.current[c.id] = el; }}
+              data-testid={`pin-${p.id}`}
+              className={`globe-pin ${isArrived ? "pin-arrived" : ""}`}
+              style={{ borderColor: t.color, color: t.color, "--pin-color": t.color }}
+              onClick={(e) => { e.stopPropagation(); onPinClick?.(p); }}
+            >
+              {(isEvent || isArrived) && (
+                <>
+                  <span className="pulse" style={{ background: t.color }} />
+                  <span className="pulse" style={{ background: t.color, animationDelay: "0.7s" }} />
+                </>
+              )}
+              {isArrived && (
+                <>
+                  <span className="arrive-ring" style={{ borderColor: t.color }} />
+                  <span className="arrive-ring" style={{ borderColor: t.color, animationDelay: "0.6s" }} />
+                  <span className="arrive-ring" style={{ borderColor: t.color, animationDelay: "1.2s" }} />
+                </>
+              )}
+              <span className={`pin-emoji ${isEvent ? "blink" : ""} ${isArrived ? "arriving" : ""}`}>{t.emoji}</span>
+            </div>
+          );
+        }
+        // Multi-pin cluster
+        const counts = {};
+        c.pins.forEach((p) => { counts[p.type] = (counts[p.type] || 0) + 1; });
+        const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+        const dominant = PIN_TYPES[top[0][0]] || PIN_TYPES.person;
         return (
           <div
-            key={p.id}
-            ref={(el) => { if (el) pinRefs.current[p.id] = el; }}
-            data-testid={`pin-${p.id}`}
-            className={`globe-pin ${isArrived ? "pin-arrived" : ""}`}
-            style={{ borderColor: t.color, color: t.color, "--pin-color": t.color }}
-            onClick={(e) => { e.stopPropagation(); onPinClick?.(p); }}
+            key={c.id}
+            ref={(el) => { if (el) overlayRefs.current[c.id] = el; }}
+            data-testid={`cluster-${c.id}`}
+            className="globe-cluster"
+            style={{ "--cluster-color": dominant.color }}
+            onClick={(e) => { e.stopPropagation(); onClusterClick(c); }}
           >
-            {(isEvent || isArrived) && (
-              <>
-                <span className="pulse" style={{ background: t.color }} />
-                <span className="pulse" style={{ background: t.color, animationDelay: "0.7s" }} />
-              </>
-            )}
-            {isArrived && (
-              <>
-                <span className="arrive-ring" style={{ borderColor: t.color }} />
-                <span className="arrive-ring" style={{ borderColor: t.color, animationDelay: "0.6s" }} />
-                <span className="arrive-ring" style={{ borderColor: t.color, animationDelay: "1.2s" }} />
-              </>
-            )}
-            <span className={`pin-emoji ${isEvent ? "blink" : ""} ${isArrived ? "arriving" : ""}`}>{t.emoji}</span>
+            <span className="cluster-ring" />
+            <span className="cluster-bubble">
+              <span className="cluster-emojis">{top.map(([k]) => PIN_TYPES[k]?.emoji).join("")}</span>
+              <span className="cluster-count">{c.pins.length}</span>
+            </span>
           </div>
         );
       })}
 
-      {/* Hover tooltip */}
-      {hoveredPin && (
-        <PinTooltip pin={hoveredPin} />
+      {hoveredCluster && (
+        <ClusterTooltip cluster={hoveredCluster} />
       )}
 
-      {/* Search not-found shake (handled by parent for shake) */}
       {notFound && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-red-500/20 backdrop-blur border border-red-400/30 text-sm text-red-200" data-testid="search-not-found">
           Şehir bulunamadı, geocoding deneniyor…
@@ -477,29 +484,49 @@ export default function DiasporaGlobe({
   );
 }
 
-function PinTooltip({ pin }) {
-  const t = PIN_TYPES[pin.type] || {};
-  // Find DOM element to position tooltip near (we'll just use fixed offset from pin)
-  const el = document.querySelector(`[data-testid="pin-${pin.id}"]`);
+function ClusterTooltip({ cluster }) {
+  const el = document.querySelector(cluster.pins.length === 1
+    ? `[data-testid="pin-${cluster.pins[0].id}"]`
+    : `[data-testid="cluster-${cluster.id}"]`);
   if (!el) return null;
   const rect = el.getBoundingClientRect();
   const parentRect = el.parentElement.getBoundingClientRect();
   const top = rect.top - parentRect.top - 18;
   const left = rect.left - parentRect.left + 22;
+  if (cluster.pins.length === 1) {
+    const p = cluster.pins[0];
+    const t = PIN_TYPES[p.type] || {};
+    return (
+      <div
+        data-testid="pin-tooltip"
+        className="absolute z-30 px-3 py-2 rounded-lg backdrop-blur-md text-xs whitespace-nowrap pointer-events-none"
+        style={{
+          top, left,
+          background: "rgba(8,10,18,0.85)",
+          border: `1px solid ${t.color}55`,
+          color: "#fff",
+          boxShadow: `0 6px 24px ${t.color}33`,
+        }}
+      >
+        <div className="font-medium" style={{ color: t.color }}>{p.name}</div>
+        <div className="text-white/60">{p.hood ? `${p.hood}, ` : ""}{p.city}</div>
+      </div>
+    );
+  }
+  // Multi-pin tooltip
   return (
     <div
-      data-testid="pin-tooltip"
+      data-testid="cluster-tooltip"
       className="absolute z-30 px-3 py-2 rounded-lg backdrop-blur-md text-xs whitespace-nowrap pointer-events-none"
       style={{
         top, left,
-        background: "rgba(8,10,18,0.85)",
-        border: `1px solid ${t.color}55`,
+        background: "rgba(8,10,18,0.9)",
+        border: "1px solid rgba(255,255,255,0.15)",
         color: "#fff",
-        boxShadow: `0 6px 24px ${t.color}33`,
       }}
     >
-      <div className="font-medium" style={{ color: t.color }}>{pin.name}</div>
-      <div className="text-white/60">{pin.hood ? `${pin.hood}, ` : ""}{pin.city}</div>
+      <div className="font-medium">{cluster.pins.length} yer</div>
+      <div className="text-white/60">tıkla → yakınlaş</div>
     </div>
   );
 }

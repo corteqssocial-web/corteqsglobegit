@@ -8,7 +8,7 @@ Geocoding: Google Geocoding API proxied server-side.
 
 # REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
 
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, Query, UploadFile, File
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -53,6 +53,8 @@ class PinIn(BaseModel):
     hood: Optional[str] = ""
     lat: float
     lng: float
+    description: Optional[str] = ""
+    image_url: Optional[str] = ""
 
 
 class PinOut(BaseModel):
@@ -398,12 +400,66 @@ async def create_pin(body: PinIn, user: dict = Depends(require_user)):
         "hood": (body.hood or "").strip(),
         "lat": body.lat,
         "lng": body.lng,
+        "description": (body.description or "").strip(),
+        "image_url": (body.image_url or "").strip(),
         "status": "pending",
         "user_id": user["id"],
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     sb.table("pins").insert(payload).execute()
     return {"pin": payload}
+
+
+# ---------- Routes: Pin image upload (Supabase Storage) ----------
+@api.post("/upload/pin-image")
+async def upload_pin_image(file: UploadFile = File(...), user: dict = Depends(require_user)):
+    contents = await file.read()
+    if len(contents) > 4 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Image too large (max 4 MB)")
+    ext = ((file.filename or "").rsplit(".", 1)[-1] or "jpg").lower()
+    if ext not in {"jpg", "jpeg", "png", "webp", "gif"}:
+        raise HTTPException(status_code=400, detail="Only jpg/png/webp/gif allowed")
+    content_type = file.content_type or f"image/{'jpeg' if ext == 'jpg' else ext}"
+    path = f"{user['id']}/{uuid.uuid4().hex}.{ext}"
+    try:
+        sb.storage.from_("pin-images").upload(
+            path, contents,
+            {"content-type": content_type, "cache-control": "public, max-age=31536000"},
+        )
+    except Exception as e:
+        log.exception("storage upload failed")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
+    public_url = sb.storage.from_("pin-images").get_public_url(path)
+    # supabase-py sometimes returns URL with trailing '?' — strip it
+    public_url = public_url.rstrip("?")
+    return {"url": public_url, "path": path}
+
+
+# ---------- Routes: Geo-IP (initial fly-to) ----------
+@api.get("/geoip")
+async def geoip(request: Request):
+    """Return user's approximate country + lat/lng via IP geolocation."""
+    fwd = request.headers.get("x-forwarded-for", "")
+    ip = (fwd.split(",")[0].strip() if fwd else "") or request.headers.get("x-real-ip") or (request.client.host if request.client else "")
+    default = {"country_code": "TR", "country_name": "Türkiye", "lat": 41.01, "lng": 28.96, "city": "Istanbul"}
+    if not ip or ip.startswith(("127.", "10.", "192.168.")) or ip in ("unknown", "::1"):
+        return {**default, "fallback": True}
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as c:
+            r = await c.get(f"http://ip-api.com/json/{ip}", params={"fields": "status,country,countryCode,city,lat,lon"})
+        if r.status_code != 200:
+            return {**default, "fallback": True}
+        d = r.json()
+        if d.get("status") != "success" or d.get("lat") is None:
+            return {**default, "fallback": True}
+        return {
+            "country_code": d.get("countryCode", ""),
+            "country_name": d.get("country", ""),
+            "city": d.get("city", ""),
+            "lat": d["lat"], "lng": d["lon"], "fallback": False,
+        }
+    except Exception:
+        return {**default, "fallback": True}
 
 
 @api.patch("/pins/{pin_id}")
