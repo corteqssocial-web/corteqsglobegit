@@ -366,7 +366,8 @@ export default function DiasporaGlobe({
     if (!t.globe || !t.camera) return;
     autoRotate.current = false;
     const targetY = -coords.lng * (Math.PI / 180);
-    const targetX = -coords.lat * (Math.PI / 180) * 0.4;
+    // Match the actual globe coordinate system so fly-to centers the selected pin.
+    const targetX = clamp(-(coords.lat * Math.PI) / 180, -1.3, 1.3);
     let diffY = targetY - t.globe.rotation.y;
     while (diffY > Math.PI) diffY -= 2 * Math.PI;
     while (diffY < -Math.PI) diffY += 2 * Math.PI;
