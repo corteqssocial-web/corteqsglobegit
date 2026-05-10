@@ -254,7 +254,7 @@ function MainScreen() {
         ))}
       </aside>
 
-      {/* Bottom-center: Add pin FAB (moved from bottom-right to avoid Emergent badge overlay) */}
+      {/* Bottom-center: Add pin FAB */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50">
         <Button
           data-testid="add-pin-fab"

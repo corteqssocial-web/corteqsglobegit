@@ -4,7 +4,7 @@
 > CorteQS Diaspora Globe — full-stack uygulama kur.
 > Stack: React + Three.js + FastAPI + Supabase
 > Tasarım: NASA Blue Marble texture + dark space tema
-> Auth: Supabase Email+Password + Emergent Google OAuth
+> Auth: Supabase Email+Password + Supabase Google OAuth
 > Özellikler: v1.0 (pin görüntüleme, hover, arama, fly-to, otomatik döndürme) + v1.1 (Google Geocoding ile şehir arama, haritada tıkla pin ekleme, pinch-to-zoom)
 > Sample veri: ~25 pin (Avrupa diasporası ağırlıklı + global karışım)
 
@@ -14,8 +14,8 @@ Reference doc: `CorteQS Diaspora Globe.md` (uploaded by user).
 ## Architecture
 - **Frontend**: React 19 + react-router-dom 7 + Three.js 0.184 + @supabase/supabase-js + shadcn/ui + Sora font
 - **Backend**: FastAPI on :8001 (k8s ingress `/api/*`), supabase-py admin client, httpx for geocoding
-- **DB / Auth**: Supabase Postgres (tables: `profiles`, `pins`, `user_sessions`)
-- **Hybrid auth**: Supabase JWT (Bearer) for email/pass, Emergent httpOnly cookie for Google OAuth
+- **DB / Auth**: Supabase Postgres (tables: `profiles`, `pins`)
+- **Auth**: Supabase JWT (Bearer) for both email/password and Google OAuth flows
 
 ## User Personas
 1. **Anonymous visitor** — explores globe, searches cities, hovers pins, sees approved pins only
@@ -32,7 +32,7 @@ Reference doc: `CorteQS Diaspora Globe.md` (uploaded by user).
 - ✅ Search with local CITIES dictionary + live **Google Geocoding** suggestions (v1.1)
 - ✅ Filter rail (5 types + counts)
 - ✅ **Click-on-globe to add pin (v1.1)** — converts world→lat/lng, opens modal
-- ✅ Auth modal with tabs: Email/Pass (Supabase admin API) + Google OAuth (Emergent)
+- ✅ Auth modal with tabs: Email/Pass (Supabase admin API) + Google OAuth (Supabase signInWithOAuth)
 - ✅ Pin moderation flow (status pending|approved|rejected) + admin panel `/admin`
 - ✅ Geocoding proxy with API key kept server-side
 - ✅ Sample seed of 25 pins (Berlin/Istanbul/Paris/London/Amsterdam/...)

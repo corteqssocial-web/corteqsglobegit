@@ -1,11 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import api from "@/lib/api";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function AuthCallback() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { refresh } = useAuth();
   const [error, setError] = useState("");
   const hasProcessed = useRef(false);
@@ -15,23 +13,6 @@ export default function AuthCallback() {
     hasProcessed.current = true;
 
     const hash = window.location.hash || "";
-
-    // Emergent OAuth flow: #session_id=...
-    const emergentMatch = hash.match(/session_id=([^&]+)/);
-    if (emergentMatch) {
-      const sessionId = decodeURIComponent(emergentMatch[1]);
-      (async () => {
-        try {
-          await api.post("/auth/emergent/callback", { session_id: sessionId });
-          window.history.replaceState(null, "", window.location.pathname);
-          await refresh();
-          navigate("/", { replace: true });
-        } catch (e) {
-          setError(e?.response?.data?.detail || e.message || "Auth failed");
-        }
-      })();
-      return;
-    }
 
     // Supabase OAuth flow: #access_token=... (detectSessionInUrl handles session automatically)
     if (hash.includes("access_token=")) {

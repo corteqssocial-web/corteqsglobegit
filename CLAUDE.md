@@ -21,7 +21,7 @@ CorteQS Globe is a full-stack diaspora globe application with a **React frontend
 - FastAPI with uvicorn
 - Supabase (PostgreSQL) for database
 - Google Geocoding API for location services
-- Emergent-managed Google OAuth integration
+- Supabase Auth (Email/Password + Google OAuth)
 - Pydantic for request/response models
 - JWT for session verification
 
@@ -77,7 +77,7 @@ flake8 .
 
 **Environment Setup:**
 1. Copy `backend/.env.example` to `backend/.env`
-2. Configure required variables: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, GOOGLE_GEOCODING_API_KEY, EMERGENT_AUTH_URL, ADMIN_EMAILS
+2. Configure required variables: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, GOOGLE_GEOCODING_API_KEY, ADMIN_EMAILS
 
 ### Docker Deployment
 
@@ -104,7 +104,7 @@ docker-compose up --build
 - `hooks/use-toast.js` — Custom hook for toast notifications (from Sonner)
 
 **Key Patterns:**
-- **Auth Flow:** Supabase Email/Password (JWT) + Emergent Google OAuth (session_id → httpOnly cookie)
+- **Auth Flow:** Supabase Email/Password + Supabase Google OAuth (JWT-based)
 - **Realtime Updates:** Supabase Realtime subscriptions for live pin updates
 - **Routing:** React Router with AuthCallback component for OAuth redirect handling
 - **State Management:** React Context (AuthContext) for auth; local component state for UI (pins, filters, search)
@@ -113,7 +113,7 @@ docker-compose up --build
 ### Backend Architecture
 
 **Key Components in `server.py`:**
-- **Models:** Pydantic data classes (PinIn, PinOut, UserSession, etc.) for validation
+- **Models:** Pydantic data classes (PinIn, PinOut, etc.) for validation
 - **Clients:** Two Supabase clients:
   - `sb` — Service role client (admin privileges, bypasses RLS)
   - `sb_auth` — Anon key client (for auth operations)
@@ -124,12 +124,11 @@ docker-compose up --build
 **Database Schema:**
 - `profiles` — User profiles
 - `pins` — Diaspora data (type, location, creator)
-- `user_sessions` — OAuth session tracking
 
 **Auth Flow:**
-1. Frontend: Email/Password → Supabase JWT
-2. Frontend: Google OAuth → Emergent → session_id → backend httpOnly cookie
-3. Backend: Verify JWT from Authorization header or session cookie
+1. Frontend: Email/Password or Google OAuth → Supabase issues JWT
+2. Backend: Verify JWT from `Authorization: Bearer` header
+3. JWT decode is unsigned (Supabase already validated; for stronger verification, use SUPABASE_JWT_SECRET)
 
 ### Environment & Deployment
 
@@ -192,7 +191,6 @@ docker-compose up --build
 **Backend Changes:**
 - Edit `backend/server.py` auth endpoints
 - Update JWT verification logic if needed
-- Check Emergent OAuth session handling
 
 ### Adding a New API Endpoint
 
@@ -220,9 +218,9 @@ docker-compose up --build
 ### Critical Auth Behavior
 
 - **Frontend JWT:** Supabase session stored in localStorage; sent as Bearer token
-- **Backend JWT Verification:** Uses SUPABASE_ANON_KEY public key (not service role)
-- **Session Cookies:** Emergent Google OAuth uses httpOnly cookies; never expose in JavaScript
-- **EMERGENT_AUTH_URL:** Must not have fallbacks or redirect URLs (breaks auth)
+- **Backend JWT Verification:** Decodes JWT claims without signature verification (trusts Supabase issuer); for production, use SUPABASE_JWT_SECRET to verify
+- **Session Persistence:** Supabase client handles `persistSession: true` + `autoRefreshToken: true`
+- **OAuth Callback:** `/auth/callback` route handles Supabase OAuth redirect via `detectSessionInUrl`
 
 ### Supabase Clients
 

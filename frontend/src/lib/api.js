@@ -6,7 +6,7 @@ export const API = `${BACKEND_URL}/api`;
 
 const client = axios.create({
   baseURL: API,
-  withCredentials: true, // send Emergent httpOnly cookie
+  withCredentials: true,
 });
 
 // Request interceptor: attach JWT token if available

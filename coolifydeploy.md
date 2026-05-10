@@ -79,7 +79,6 @@ SQL dosyalarini su sirayla calistir:
 
 - `public.profiles` tablosunu olusturur
 - `public.pins` tablosunu olusturur
-- `public.user_sessions` tablosunu olusturur
 - RLS'i etkinlestirir
 - `pins` tablosunu `supabase_realtime` publication'a ekler
 
@@ -101,7 +100,6 @@ Kurulum bittiginde asagidaki yapilar mevcut olmalidir:
 
 - `public.profiles`
 - `public.pins`
-- `public.user_sessions`
 - `public.pins.image_url`
 - `public.pins.description`
 - `storage.buckets` icinde `pin-images`
@@ -168,7 +166,6 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-supabase-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 GOOGLE_GEOCODING_API_KEY=your-google-geocoding-api-key
-EMERGENT_AUTH_URL=https://demobackend.emergentagent.com
 ADMIN_EMAILS=admin@example.com
 CORS_ORIGINS=https://globe.example.com
 ```
@@ -179,7 +176,6 @@ Aciklamalar:
 - `SUPABASE_ANON_KEY`: public auth isleri icin gerekli anahtar
 - `SUPABASE_SERVICE_ROLE_KEY`: sadece backend kullanmali, frontend'e asla gitmemeli
 - `GOOGLE_GEOCODING_API_KEY`: geocoding endpoint'i icin gerekli
-- `EMERGENT_AUTH_URL`: harici auth callback yapisi kullaniyorsan gerekli
 - `ADMIN_EMAILS`: admin paneline girecek mailleri virgul ile ayirarak yaz
 - `CORS_ORIGINS`: dokumantasyon amacli tutuyoruz; mevcut backend kodu su an bunu aktif sekilde uygulamiyor
 
@@ -453,7 +449,7 @@ Hemen yapilacaklar:
 Deploy'u tamamlamadan once su checklist'i bitir:
 
 - Supabase SQL'leri sirayla calisti
-- `profiles`, `pins`, `user_sessions` tablolari mevcut
+- `profiles`, `pins` tablolari mevcut
 - `pin-images` bucket mevcut
 - Coolify compose resource olustu
 - Public domain sadece `frontend` servisine bagli
@@ -474,7 +470,6 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 GOOGLE_GEOCODING_API_KEY=your-google-key
-EMERGENT_AUTH_URL=https://demobackend.emergentagent.com
 ADMIN_EMAILS=admin@example.com,owner@example.com
 CORS_ORIGINS=https://globe.example.com
 

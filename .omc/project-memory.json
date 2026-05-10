@@ -130,6 +130,24 @@
   },
   "hotPaths": [
     {
+      "path": "backend\\server.py",
+      "accessCount": 23,
+      "lastAccessed": 1778418363706,
+      "type": "file"
+    },
+    {
+      "path": "coolifydeploy.md",
+      "accessCount": 12,
+      "lastAccessed": 1778418341574,
+      "type": "file"
+    },
+    {
+      "path": "memory\\MEMORY.md",
+      "accessCount": 10,
+      "lastAccessed": 1778418318727,
+      "type": "file"
+    },
+    {
       "path": "frontend\\src\\contexts\\AuthContext.jsx",
       "accessCount": 9,
       "lastAccessed": 1778417269318,
@@ -137,26 +155,44 @@
     },
     {
       "path": "frontend\\src\\App.js",
-      "accessCount": 7,
-      "lastAccessed": 1778417249104,
+      "accessCount": 9,
+      "lastAccessed": 1778417928349,
       "type": "file"
     },
     {
-      "path": "backend\\server.py",
-      "accessCount": 4,
-      "lastAccessed": 1778415863837,
+      "path": "CLAUDE.md",
+      "accessCount": 9,
+      "lastAccessed": 1778418121957,
       "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 7,
+      "lastAccessed": 1778418348640,
+      "type": "directory"
     },
     {
       "path": "frontend\\src\\lib\\api.js",
-      "accessCount": 4,
-      "lastAccessed": 1778415888653,
+      "accessCount": 6,
+      "lastAccessed": 1778417916129,
+      "type": "file"
+    },
+    {
+      "path": "memory\\PRD.md",
+      "accessCount": 5,
+      "lastAccessed": 1778418281404,
       "type": "file"
     },
     {
       "path": "frontend\\src\\components\\AuthCallback.jsx",
-      "accessCount": 3,
-      "lastAccessed": 1778414494110,
+      "accessCount": 4,
+      "lastAccessed": 1778417904122,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 4,
+      "lastAccessed": 1778418132229,
       "type": "file"
     },
     {
@@ -166,21 +202,27 @@
       "type": "directory"
     },
     {
-      "path": "",
-      "accessCount": 2,
-      "lastAccessed": 1778415217849,
-      "type": "directory"
-    },
-    {
-      "path": "README.md",
-      "accessCount": 2,
-      "lastAccessed": 1778415221765,
+      "path": "frontend\\package.json",
+      "accessCount": 3,
+      "lastAccessed": 1778417880163,
       "type": "file"
     },
     {
-      "path": "frontend\\package.json",
-      "accessCount": 2,
-      "lastAccessed": 1778415221999,
+      "path": "frontend\\.env.example",
+      "accessCount": 3,
+      "lastAccessed": 1778418194967,
+      "type": "file"
+    },
+    {
+      "path": "backend\\supabase_setup.sql",
+      "accessCount": 3,
+      "lastAccessed": 1778418355786,
+      "type": "file"
+    },
+    {
+      "path": "corteqs-env\\supabase_setup.sql",
+      "accessCount": 3,
+      "lastAccessed": 1778418356797,
       "type": "file"
     },
     {
@@ -196,12 +238,6 @@
       "type": "file"
     },
     {
-      "path": "CLAUDE.md",
-      "accessCount": 2,
-      "lastAccessed": 1778415677221,
-      "type": "file"
-    },
-    {
       "path": "frontend\\src\\lib\\supabase.js",
       "accessCount": 2,
       "lastAccessed": 1778415851231,
@@ -214,15 +250,51 @@
       "type": "file"
     },
     {
-      "path": "coolifydeploy.md",
-      "accessCount": 1,
-      "lastAccessed": 1778414158900,
+      "path": "issue.png",
+      "accessCount": 2,
+      "lastAccessed": 1778417752183,
       "type": "file"
     },
     {
-      "path": "memory\\PRD.md",
-      "accessCount": 1,
-      "lastAccessed": 1778414158962,
+      "path": "frontend\\public\\index.html",
+      "accessCount": 2,
+      "lastAccessed": 1778417874841,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\craco.config.js",
+      "accessCount": 2,
+      "lastAccessed": 1778417892471,
+      "type": "file"
+    },
+    {
+      "path": "backend\\tests\\backend_test.py",
+      "accessCount": 2,
+      "lastAccessed": 1778418067655,
+      "type": "file"
+    },
+    {
+      "path": "backend\\.env.example",
+      "accessCount": 2,
+      "lastAccessed": 1778418154478,
+      "type": "file"
+    },
+    {
+      "path": "backend\\.env",
+      "accessCount": 2,
+      "lastAccessed": 1778418175062,
+      "type": "file"
+    },
+    {
+      "path": ".env.production",
+      "accessCount": 2,
+      "lastAccessed": 1778418183973,
+      "type": "file"
+    },
+    {
+      "path": ".env.local",
+      "accessCount": 2,
+      "lastAccessed": 1778418189988,
       "type": "file"
     },
     {
@@ -238,33 +310,9 @@
       "type": "file"
     },
     {
-      "path": "memory\\MEMORY.md",
-      "accessCount": 1,
-      "lastAccessed": 1778414305622,
-      "type": "file"
-    },
-    {
       "path": "frontend\\src\\index.js",
       "accessCount": 1,
       "lastAccessed": 1778414371552,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\craco.config.js",
-      "accessCount": 1,
-      "lastAccessed": 1778415237244,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\.env.example",
-      "accessCount": 1,
-      "lastAccessed": 1778415254418,
-      "type": "file"
-    },
-    {
-      "path": "issue.png",
-      "accessCount": 1,
-      "lastAccessed": 1778417241877,
       "type": "file"
     }
   ],

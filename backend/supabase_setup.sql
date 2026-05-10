@@ -3,11 +3,10 @@
 
 -- ============ profiles ============
 CREATE TABLE IF NOT EXISTS public.profiles (
-  id          TEXT PRIMARY KEY,            -- supabase user uuid OR emergent id
+  id          TEXT PRIMARY KEY,            -- supabase user uuid
   email       TEXT UNIQUE NOT NULL,
   name        TEXT DEFAULT '',
   picture     TEXT DEFAULT '',
-  provider    TEXT DEFAULT 'supabase',     -- supabase | emergent
   is_admin    BOOLEAN DEFAULT FALSE,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
@@ -28,21 +27,16 @@ CREATE TABLE IF NOT EXISTS public.pins (
 CREATE INDEX IF NOT EXISTS idx_pins_status ON public.pins(status);
 CREATE INDEX IF NOT EXISTS idx_pins_type   ON public.pins(type);
 
--- ============ user_sessions (for Emergent OAuth) ============
-CREATE TABLE IF NOT EXISTS public.user_sessions (
-  session_token  TEXT PRIMARY KEY,
-  user_id        TEXT NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  expires_at     TIMESTAMPTZ NOT NULL,
-  created_at     TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_sessions_user ON public.user_sessions(user_id);
-
 -- Backend uses SERVICE_ROLE key which bypasses RLS — no policies needed.
 -- If you want to expose tables via Supabase JS directly, enable RLS + policies here.
-ALTER TABLE public.profiles      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.pins          ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pins     ENABLE ROW LEVEL SECURITY;
 
 -- ============ realtime ============
 -- Enable Supabase Realtime on the pins table so frontend can listen to live INSERT/UPDATE/DELETE.
 ALTER PUBLICATION supabase_realtime ADD TABLE public.pins;
+
+-- ============ migration: drop legacy columns/tables (safe to run multiple times) ============
+-- Drop legacy emergent OAuth artifacts if migrating from old schema
+DROP TABLE IF EXISTS public.user_sessions;
+ALTER TABLE public.profiles DROP COLUMN IF EXISTS provider;

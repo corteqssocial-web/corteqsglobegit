@@ -1,14 +1,11 @@
 """CorteQS Diaspora Globe — FastAPI backend.
 
-Auth: Supabase Email/Password (frontend handles via supabase-js + JWT verification on backend)
-   + Emergent-managed Google OAuth (session_id exchange → httpOnly cookie).
-DB: Supabase (Postgres). Tables: profiles, pins, user_sessions.
+Auth: Supabase Email/Password + Supabase Google OAuth (frontend handles via supabase-js + JWT verification on backend).
+DB: Supabase (Postgres). Tables: profiles, pins.
 Geocoding: Google Geocoding API proxied server-side.
 """
 
-# REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, Query, UploadFile, File
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Query, UploadFile, File
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -16,7 +13,7 @@ from supabase import create_client, Client
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional
 from pathlib import Path
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import os
 import logging
 import uuid
@@ -30,7 +27,6 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_ANON_KEY = os.environ["SUPABASE_ANON_KEY"]
 SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 GOOGLE_GEOCODING_API_KEY = os.environ["GOOGLE_GEOCODING_API_KEY"]
-EMERGENT_AUTH_URL = os.environ.get("EMERGENT_AUTH_URL", "https://demobackend.emergentagent.com")
 ADMIN_EMAILS = [e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
 
 # Service role client bypasses RLS — used for ALL data ops (never touch .auth on this!)
@@ -81,10 +77,6 @@ class LoginIn(BaseModel):
     password: str
 
 
-class EmergentCallbackIn(BaseModel):
-    session_id: str
-
-
 class PatchPinIn(BaseModel):
     status: str  # approved | rejected | pending
 
@@ -95,7 +87,6 @@ class UserOut(BaseModel):
     name: str
     picture: Optional[str] = ""
     is_admin: bool = False
-    provider: str = "supabase"  # supabase | emergent
 
 
 # ---------- Helpers ----------
@@ -105,7 +96,7 @@ def is_admin_email(email: Optional[str]) -> bool:
     return email.lower() in ADMIN_EMAILS
 
 
-async def ensure_profile(user_id: str, email: str, name: str = "", picture: str = "", provider: str = "supabase") -> dict:
+async def ensure_profile(user_id: str, email: str, name: str = "", picture: str = "") -> dict:
     """Insert profile if missing; otherwise return existing. Never overwrites is_admin (computed live)."""
     existing = sb.table("profiles").select("*").eq("id", user_id).limit(1).execute()
     if existing.data:
@@ -115,47 +106,10 @@ async def ensure_profile(user_id: str, email: str, name: str = "", picture: str 
         "email": email,
         "name": name or email.split("@")[0],
         "picture": picture,
-        "provider": provider,
         "is_admin": is_admin_email(email),
     }
     sb.table("profiles").insert(payload).execute()
     return payload
-
-
-async def get_user_from_emergent_cookie(request: Request) -> Optional[dict]:
-    token = request.cookies.get("session_token")
-    if not token:
-        # fallback: Authorization Bearer
-        auth = request.headers.get("authorization", "")
-        if auth.lower().startswith("bearer "):
-            token = auth.split(" ", 1)[1]
-    if not token:
-        return None
-
-    res = sb.table("user_sessions").select("*").eq("session_token", token).limit(1).execute()
-    if not res.data:
-        return None
-    sess = res.data[0]
-    expires_at = sess["expires_at"]
-    if isinstance(expires_at, str):
-        expires_at = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if expires_at < datetime.now(timezone.utc):
-        return None
-
-    prof = sb.table("profiles").select("*").eq("id", sess["user_id"]).limit(1).execute()
-    if not prof.data:
-        return None
-    p = prof.data[0]
-    return {
-        "id": p["id"],
-        "email": p["email"],
-        "name": p.get("name") or "",
-        "picture": p.get("picture") or "",
-        "is_admin": is_admin_email(p["email"]),  # live check, not stored value
-        "provider": p.get("provider") or "emergent",
-    }
 
 
 def get_user_from_supabase_jwt(request: Request) -> Optional[dict]:
@@ -184,7 +138,6 @@ def get_user_from_supabase_jwt(request: Request) -> Optional[dict]:
         "name": name,
         "picture": "",
         "is_admin": is_admin_email(email),
-        "provider": "supabase",
     }
 
 
@@ -192,9 +145,9 @@ async def current_user(request: Request) -> Optional[dict]:
     user = get_user_from_supabase_jwt(request)
     if user:
         # Read-only: ensure profile exists once (insert if missing). is_admin computed live.
-        await ensure_profile(user["id"], user["email"], user.get("name", ""), user.get("picture", ""), "supabase")
+        await ensure_profile(user["id"], user["email"], user.get("name", ""), user.get("picture", ""))
         return user
-    return await get_user_from_emergent_cookie(request)
+    return None
 
 
 async def require_user(request: Request) -> dict:
@@ -243,7 +196,7 @@ async def signup(body: SignupIn):
         raise HTTPException(status_code=400, detail=msg)
 
     # 2) Ensure profile (data write — uses service-role client, never mutated by auth)
-    await ensure_profile(user.id, user.email, body.name or "", "", "supabase")
+    await ensure_profile(user.id, user.email, body.name or "", "")
 
     # 3) Sign in via the SEPARATE auth client (never use `sb` for sign_in — would corrupt service-role session)
     try:
@@ -276,7 +229,7 @@ async def login(body: LoginIn):
 
     # Ensure profile exists (only inserts on first login if signup didn't run via our /signup)
     name = (user.user_metadata or {}).get("name", "") or ""
-    await ensure_profile(user.id, user.email, name, "", "supabase")
+    await ensure_profile(user.id, user.email, name, "")
     return {
         "access_token": sess.access_token,
         "refresh_token": sess.refresh_token,
@@ -285,55 +238,6 @@ async def login(body: LoginIn):
             "name": name,
             "is_admin": is_admin_email(user.email),
         },
-    }
-
-
-# ---------- Routes: Emergent Google OAuth ----------
-@api.post("/auth/emergent/callback")
-async def emergent_callback(body: EmergentCallbackIn, response: Response):
-    """Exchange Emergent session_id for user data + session_token, store, set cookie."""
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        r = await client.get(
-            f"{EMERGENT_AUTH_URL}/auth/v1/env/oauth/session-data",
-            headers={"X-Session-ID": body.session_id},
-        )
-    if r.status_code != 200:
-        raise HTTPException(status_code=401, detail=f"Emergent auth failed: {r.text}")
-    data = r.json()
-    email = data["email"]
-    name = data.get("name", "")
-    picture = data.get("picture", "")
-    session_token = data["session_token"]
-
-    # Use Emergent's `id` as our profile id (deterministic per email)
-    user_id = data.get("id") or f"emg_{uuid.uuid4().hex[:12]}"
-
-    # Upsert profile (use service-role client which is never auth-mutated)
-    await ensure_profile(user_id, email, name, picture, "emergent")
-
-    # Store session (7 days)
-    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-    sb.table("user_sessions").upsert({
-        "session_token": session_token,
-        "user_id": user_id,
-        "expires_at": expires_at.isoformat(),
-    }, on_conflict="session_token").execute()
-
-    # Set httpOnly cookie
-    response.set_cookie(
-        key="session_token",
-        value=session_token,
-        httponly=True,
-        secure=True,
-        samesite="none",
-        path="/",
-        max_age=7 * 24 * 60 * 60,
-    )
-    return {
-        "user": {
-            "id": user_id, "email": email, "name": name, "picture": picture,
-            "is_admin": is_admin_email(email), "provider": "emergent",
-        }
     }
 
 
@@ -346,14 +250,8 @@ async def auth_me(request: Request):
 
 
 @api.post("/auth/logout")
-async def logout(request: Request, response: Response):
-    token = request.cookies.get("session_token")
-    if token:
-        try:
-            sb.table("user_sessions").delete().eq("session_token", token).execute()
-        except Exception:
-            pass
-    response.delete_cookie("session_token", path="/", samesite="none", secure=True)
+async def logout():
+    """Supabase JWT is managed client-side; server-side logout is a no-op."""
     return {"ok": True}
 
 

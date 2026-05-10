@@ -42,7 +42,7 @@ corteqs_globe/
 │   ├── Dockerfile
 │   └── nginx.conf          # /api → backend:8001, SPA fallback
 ├── corteqs-env/            # SQL files for Supabase (canonical source for deploy docs)
-│   ├── supabase_setup.sql  # Tables: profiles, pins, user_sessions + RLS
+│   ├── supabase_setup.sql  # Tables: profiles, pins + RLS
 │   ├── realtime_enable.sql # Add pins to publication + approved-read policy
 │   └── p1_setup.sql        # Add image_url/description cols + pin-images storage bucket
 ├── docker-compose.yaml     # backend (env_file: .env.production) + frontend (build args)
@@ -61,7 +61,6 @@ corteqs_globe/
 | email | text | |
 | name | text | |
 | picture | text | avatar URL |
-| provider | text | `supabase` \| `emergent` |
 | is_admin | bool | stored but always overridden live by ADMIN_EMAILS env |
 
 ### `public.pins`
@@ -80,14 +79,6 @@ corteqs_globe/
 | image_url | text | added by p1_setup.sql |
 | description | text | added by p1_setup.sql, max 500 chars |
 
-### `public.user_sessions`
-Used for Emergent Google OAuth sessions (7-day httpOnly cookie flow).
-| col | type |
-|-----|------|
-| session_token | text PK |
-| user_id | uuid |
-| expires_at | timestamptz |
-
 ### Supabase Storage
 - Bucket: `pin-images` (public read, max 4MB, jpg/png/webp/gif)
 - Path pattern: `{user_id}/{uuid}.{ext}`
@@ -104,9 +95,8 @@ All routes are in `backend/server.py` under `api = APIRouter(prefix="/api")`.
 | GET | `/health` | none | `{"ok":true}` |
 | POST | `/auth/signup` | none | Create user via Supabase admin API, return JWT tokens |
 | POST | `/auth/login` | none | Supabase sign_in_with_password, return JWT tokens |
-| POST | `/auth/emergent/callback` | none | Exchange session_id for user, set httpOnly cookie |
 | GET | `/auth/me` | any | Returns current user dict |
-| POST | `/auth/logout` | any | Delete session cookie + DB row |
+| POST | `/auth/logout` | any | No-op (Supabase JWT is client-managed) |
 | GET | `/pins` | none/admin | Approved pins (all if admin) |
 | GET | `/pins/mine` | user | Own pins |
 | GET | `/pins/admin` | admin | All pins |
@@ -122,7 +112,6 @@ All routes are in `backend/server.py` under `api = APIRouter(prefix="/api")`.
 - **Two Supabase clients**: `sb` (service role, for data ops) and `sb_auth` (anon key, for sign_in only). Never mix them — `sb` must not mutate session.
 - **JWT decoding**: `pyjwt` without signature verification (trusts Supabase-issued token). Validates `iss` contains "supabase".
 - **Admin check**: Live lookup of email in `ADMIN_EMAILS` env var — never trust stored `is_admin`.
-- **Emergent OAuth**: httpOnly cookie `session_token`, verified against `user_sessions` table.
 
 ---
 
@@ -132,7 +121,7 @@ All routes are in `backend/server.py` under `api = APIRouter(prefix="/api")`.
 `@/` resolves to `frontend/src/` (configured in `craco.config.js`).
 
 ### API Client (`src/lib/api.js`)
-Axios with `withCredentials: true` (for Emergent cookie) + interceptor that attaches Supabase JWT Bearer token on every request.
+Axios with `withCredentials: true` + request interceptor that attaches Supabase JWT Bearer token on every request. Response interceptor signs out on 401.
 
 ### Auth Flow (`src/contexts/AuthContext.jsx`)
 - On mount: calls `/api/auth/me` to restore session
@@ -169,7 +158,6 @@ SUPABASE_URL
 SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY   # NEVER give to frontend
 GOOGLE_GEOCODING_API_KEY
-EMERGENT_AUTH_URL           # default: https://demobackend.emergentagent.com
 ADMIN_EMAILS                # comma-separated
 CORS_ORIGINS                # documented only; not actively enforced in code
 ```
