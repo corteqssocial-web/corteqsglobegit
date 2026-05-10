@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -12,26 +13,67 @@ export default function AuthCallback() {
     if (hasProcessed.current) return;
     hasProcessed.current = true;
 
-    const hash = window.location.hash || "";
+    let timeoutId;
+    let unsubscribe;
 
-    // Supabase OAuth flow: #access_token=... (detectSessionInUrl handles session automatically)
-    if (hash.includes("access_token=")) {
-      (async () => {
-        try {
-          // Give Supabase client a moment to parse the hash and set the session
-          await new Promise((r) => setTimeout(r, 200));
-          window.history.replaceState(null, "", window.location.pathname);
-          await refresh();
-          navigate("/", { replace: true });
-        } catch (e) {
-          setError(e?.message || "Auth failed");
-        }
-      })();
+    const finish = async () => {
+      try {
+        // Clean URL (remove hash and query params)
+        window.history.replaceState(null, "", window.location.pathname);
+        await refresh();
+        navigate("/", { replace: true });
+      } catch (e) {
+        setError(e?.message || "Auth failed");
+      }
+    };
+
+    // Strategy: wait for Supabase to detect session from URL
+    // - Implicit flow: #access_token=... (detectSessionInUrl: true handles automatically)
+    // - PKCE flow: ?code=... (Supabase exchanges automatically)
+    // Both fire onAuthStateChange when done.
+    const url = window.location.href;
+    const hasOAuthParams =
+      window.location.hash.includes("access_token=") ||
+      window.location.search.includes("code=") ||
+      window.location.hash.includes("error=") ||
+      window.location.search.includes("error=");
+
+    if (!hasOAuthParams) {
+      // No OAuth params — go home
+      navigate("/", { replace: true });
       return;
     }
 
-    // No recognized token — go home
-    navigate("/", { replace: true });
+    // Subscribe to auth state changes; finish when session is established
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" || (session && event === "TOKEN_REFRESHED")) {
+        if (timeoutId) clearTimeout(timeoutId);
+        unsubscribe?.();
+        finish();
+      }
+    });
+    unsubscribe = () => data?.subscription?.unsubscribe?.();
+
+    // Fallback: check immediately in case session is already set
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        if (timeoutId) clearTimeout(timeoutId);
+        unsubscribe?.();
+        finish();
+      }
+    })();
+
+    // Hard timeout after 8 seconds — show error if still no session
+    timeoutId = setTimeout(() => {
+      unsubscribe?.();
+      setError("Oturum kurulamadı (timeout). Lütfen tekrar deneyin.");
+    }, 8000);
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      unsubscribe?.();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

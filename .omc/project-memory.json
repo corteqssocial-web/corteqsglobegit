@@ -178,15 +178,15 @@
       "type": "file"
     },
     {
-      "path": "memory\\PRD.md",
-      "accessCount": 5,
-      "lastAccessed": 1778418281404,
+      "path": "frontend\\src\\components\\AuthCallback.jsx",
+      "accessCount": 6,
+      "lastAccessed": 1778419013896,
       "type": "file"
     },
     {
-      "path": "frontend\\src\\components\\AuthCallback.jsx",
-      "accessCount": 4,
-      "lastAccessed": 1778417904122,
+      "path": "memory\\PRD.md",
+      "accessCount": 5,
+      "lastAccessed": 1778418281404,
       "type": "file"
     },
     {
@@ -226,6 +226,12 @@
       "type": "file"
     },
     {
+      "path": "issue.png",
+      "accessCount": 3,
+      "lastAccessed": 1778418936091,
+      "type": "file"
+    },
+    {
       "path": "docker-compose.yaml",
       "accessCount": 2,
       "lastAccessed": 1778415237527,
@@ -247,12 +253,6 @@
       "path": "frontend\\src\\components\\AuthModal.jsx",
       "accessCount": 2,
       "lastAccessed": 1778417249336,
-      "type": "file"
-    },
-    {
-      "path": "issue.png",
-      "accessCount": 2,
-      "lastAccessed": 1778417752183,
       "type": "file"
     },
     {
@@ -313,6 +313,12 @@
       "path": "frontend\\src\\index.js",
       "accessCount": 1,
       "lastAccessed": 1778414371552,
+      "type": "file"
+    },
+    {
+      "path": "issue2.png",
+      "accessCount": 1,
+      "lastAccessed": 1778419183504,
       "type": "file"
     }
   ],
