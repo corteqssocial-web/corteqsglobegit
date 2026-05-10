@@ -1,0 +1,36 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env.production
+    expose:
+      - "8001"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8001/api/health')
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_BACKEND_URL: ${REACT_APP_BACKEND_URL}
+        REACT_APP_SUPABASE_URL: ${REACT_APP_SUPABASE_URL}
+        REACT_APP_SUPABASE_ANON_KEY: ${REACT_APP_SUPABASE_ANON_KEY}
+        ENABLE_HEALTH_CHECK: ${ENABLE_HEALTH_CHECK:-false}
+    depends_on:
+      backend:
+        condition: service_started
+    expose:
+      - "80"
+    restart: unless-stopped
