@@ -130,15 +130,15 @@
   },
   "hotPaths": [
     {
-      "path": "frontend\\src\\App.js",
-      "accessCount": 6,
-      "lastAccessed": 1778415248026,
+      "path": "frontend\\src\\contexts\\AuthContext.jsx",
+      "accessCount": 9,
+      "lastAccessed": 1778417269318,
       "type": "file"
     },
     {
-      "path": "frontend\\src\\contexts\\AuthContext.jsx",
-      "accessCount": 6,
-      "lastAccessed": 1778415876262,
+      "path": "frontend\\src\\App.js",
+      "accessCount": 7,
+      "lastAccessed": 1778417249104,
       "type": "file"
     },
     {
@@ -208,6 +208,12 @@
       "type": "file"
     },
     {
+      "path": "frontend\\src\\components\\AuthModal.jsx",
+      "accessCount": 2,
+      "lastAccessed": 1778417249336,
+      "type": "file"
+    },
+    {
       "path": "coolifydeploy.md",
       "accessCount": 1,
       "lastAccessed": 1778414158900,
@@ -238,12 +244,6 @@
       "type": "file"
     },
     {
-      "path": "frontend\\src\\components\\AuthModal.jsx",
-      "accessCount": 1,
-      "lastAccessed": 1778414357552,
-      "type": "file"
-    },
-    {
       "path": "frontend\\src\\index.js",
       "accessCount": 1,
       "lastAccessed": 1778414371552,
@@ -259,6 +259,12 @@
       "path": "frontend\\.env.example",
       "accessCount": 1,
       "lastAccessed": 1778415254418,
+      "type": "file"
+    },
+    {
+      "path": "issue.png",
+      "accessCount": 1,
+      "lastAccessed": 1778417241877,
       "type": "file"
     }
   ],

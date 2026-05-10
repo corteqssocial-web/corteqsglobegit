@@ -9,29 +9,45 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    try {
-      const res = await api.get("/auth/me");
-      setUser(res.data);
-    } catch {
-      setUser(null);
+    // Retry logic: session might not be loaded immediately after setSession()
+    let attempts = 0;
+    while (attempts < 3) {
+      try {
+        const res = await api.get("/auth/me");
+        setUser(res.data);
+        return; // Success
+      } catch (err) {
+        attempts++;
+        if (attempts >= 3) {
+          setUser(null);
+          return;
+        }
+        // Wait 100ms before retrying (let localStorage load)
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
     }
   }, []);
 
   useEffect(() => {
     let mounted = true;
     (async () => {
-      // Load persisted session from localStorage
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session && mounted) {
-        await refresh();
+      try {
+        // Load persisted session from localStorage
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && mounted) {
+          await refresh();
+        }
+      } catch (err) {
+        console.error("Failed to load session:", err);
+      } finally {
+        if (mounted) setLoading(false);
       }
-      if (mounted) setLoading(false);
     })();
 
     // Listen for auth state changes (login, logout, token refresh)
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_evt, session) => {
       if (session) {
-        refresh();
+        await refresh();
       } else {
         setUser(null);
       }
