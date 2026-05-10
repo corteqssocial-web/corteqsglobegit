@@ -7,6 +7,6 @@ export const supabase = createClient(url, anon, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: false, // we handle Emergent's #session_id ourselves
+    detectSessionInUrl: true,
   },
 });

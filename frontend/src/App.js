@@ -1,9 +1,8 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { Routes, Route, useNavigate } from "react-router-dom";
 import DiasporaGlobe from "@/components/DiasporaGlobe";
 import SearchBar from "@/components/SearchBar";
 import AuthModal from "@/components/AuthModal";
-import AuthCallback from "@/components/AuthCallback";
 import AddPinModal from "@/components/AddPinModal";
 import AdminPanel from "@/components/AdminPanel";
 import PinDetailDrawer from "@/components/PinDetailDrawer";
@@ -329,12 +328,6 @@ function FilterChip({ active, label, emoji, color, count, onClick, testId }) {
 }
 
 function AppShell() {
-  const location = useLocation();
-  // Process Emergent OAuth callback FIRST (synchronous render check)
-  // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-  if (location.hash?.includes("session_id=")) {
-    return <AuthCallback />;
-  }
   return (
     <Routes>
       <Route path="/" element={<MainScreen />} />

@@ -34,6 +34,16 @@ export default function AuthModal({ open, onOpenChange }) {
     }
   };
 
+  const handleGoogle = async () => {
+    setBusy(true);
+    try {
+      await loginGoogle();
+    } catch (err) {
+      toast.error(err?.message || "Google girişi başlatılamadı");
+      setBusy(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -95,7 +105,8 @@ export default function AuthModal({ open, onOpenChange }) {
         <Button
           data-testid="auth-google-btn"
           variant="outline"
-          onClick={loginGoogle}
+          onClick={handleGoogle}
+          disabled={busy}
           className="w-full bg-white text-black hover:bg-white/90 border-0"
         >
           <svg width="18" height="18" viewBox="0 0 48 48" className="mr-2">

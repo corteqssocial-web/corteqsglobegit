@@ -18,15 +18,9 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    // CRITICAL: If returning from OAuth callback, AuthCallback handles it.
-    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    if (window.location.hash?.includes("session_id=")) {
-      setLoading(false);
-      return;
-    }
-
     let mounted = true;
     (async () => {
+      await supabase.auth.getSession();
       await refresh();
       if (mounted) setLoading(false);
     })();
@@ -62,10 +56,15 @@ export function AuthProvider({ children }) {
     return res.data.user;
   };
 
-  const loginGoogle = () => {
-    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    const redirectUrl = window.location.origin + "/";
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+  const loginGoogle = async () => {
+    const redirectUrl = `${window.location.origin}/`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: redirectUrl,
+      },
+    });
+    if (error) throw error;
   };
 
   const logout = async () => {
