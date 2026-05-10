@@ -14,7 +14,7 @@ Bu rehber tek domain mimarisini esas alir:
 
 Production akisi su sekildedir:
 
-1. Kullanici `https://globe.example.com` adresini acar.
+1. Kullanici `https://globe.corteqs.net` adresini acar.
 2. Istek Coolify'da `frontend` servisine gelir.
 3. `frontend/nginx.conf`, `/api/...` ile baslayan istekleri `http://backend:8001/api/...` adresine yonlendirir.
 4. `backend` servisi FastAPI calistirir.
@@ -115,7 +115,7 @@ Bu proje icin en temiz kurulum su sekildedir:
 
 Onerilen domain modeli:
 
-- Frontend public URL: `https://globe.example.com`
+- Frontend public URL: `https://globe.corteqs.net`
 - Backend public URL: yok
 
 Neden boyle?
@@ -162,12 +162,12 @@ Bu ayrim cok onemli cunku React tarafindaki `REACT_APP_*` degiskenleri build sir
 Asagidaki degerler backend tarafinda runtime env olarak bulunmali:
 
 ```env
-SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_URL=https://hvzkpkhptgdbowucvypt.supabase.co
 SUPABASE_ANON_KEY=your-supabase-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 GOOGLE_GEOCODING_API_KEY=your-google-geocoding-api-key
 ADMIN_EMAILS=admin@example.com
-CORS_ORIGINS=https://globe.example.com
+CORS_ORIGINS=https://globe.corteqs.net
 ```
 
 Aciklamalar:
@@ -184,8 +184,8 @@ Aciklamalar:
 Asagidaki degerler frontend build sirasinda verilmelidir:
 
 ```env
-REACT_APP_BACKEND_URL=https://globe.example.com
-REACT_APP_SUPABASE_URL=https://your-project.supabase.co
+REACT_APP_BACKEND_URL=https://globe.corteqs.net
+REACT_APP_SUPABASE_URL=https://hvzkpkhptgdbowucvypt.supabase.co
 REACT_APP_SUPABASE_ANON_KEY=your-supabase-anon-key
 ENABLE_HEALTH_CHECK=false
 ```
@@ -197,7 +197,7 @@ Aciklamalar:
 - `REACT_APP_SUPABASE_ANON_KEY`: browser tarafinda kullanilacak public key
 - `ENABLE_HEALTH_CHECK=false`: production icin boyle birak
 
-### 8.3 Bu Projede Kullanilmayan Legacy Degiskenler
+### 8.3 Bu Projede Kullanilmayan Eski Degiskenler
 
 Asagidaki degiskenler eski akis kalintisi olabilir, production'da gerekli degildir:
 
@@ -265,8 +265,8 @@ Coolify tarafinda:
 
 Beklenen sonuc:
 
-- Kullanici sadece `https://globe.example.com` adresine gider
-- API cagrilari `https://globe.example.com/api/...` olarak akar
+- Kullanici sadece `https://globe.corteqs.net` adresine gider
+- API cagrilari `https://globe.corteqs.net/api/...` olarak akar
 
 ## 12. Adim Adim Deploy Akisi
 
@@ -314,7 +314,7 @@ Deploy bitti diye is bitmis sayma. Asagidaki kontrolleri tek tek yap.
 Tarayicida ac:
 
 ```text
-https://globe.example.com/
+https://globe.corteqs.net/
 ```
 
 Beklenen:
@@ -325,7 +325,7 @@ Beklenen:
 ### 13.2 Health Endpoint Calisiyor mu?
 
 ```bash
-curl https://globe.example.com/api/health
+curl https://globe.corteqs.net/api/health
 ```
 
 Beklenen:
@@ -337,7 +337,7 @@ Beklenen:
 ### 13.3 Public Pins Donuyor mu?
 
 ```bash
-curl https://globe.example.com/api/pins
+curl https://globe.corteqs.net/api/pins
 ```
 
 Beklenen:
@@ -466,16 +466,16 @@ Asagidaki ornek sadece format gostermek icindir:
 
 ```env
 # Backend
-SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_URL=https://hvzkpkhptgdbowucvypt.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 GOOGLE_GEOCODING_API_KEY=your-google-key
 ADMIN_EMAILS=admin@example.com,owner@example.com
-CORS_ORIGINS=https://globe.example.com
+CORS_ORIGINS=https://globe.corteqs.net
 
 # Frontend build
-REACT_APP_BACKEND_URL=https://globe.example.com
-REACT_APP_SUPABASE_URL=https://your-project.supabase.co
+REACT_APP_BACKEND_URL=https://globe.corteqs.net
+REACT_APP_SUPABASE_URL=https://hvzkpkhptgdbowucvypt.supabase.co
 REACT_APP_SUPABASE_ANON_KEY=your-anon-key
 ENABLE_HEALTH_CHECK=false
 ```

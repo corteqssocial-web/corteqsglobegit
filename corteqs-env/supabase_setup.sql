@@ -32,8 +32,19 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pins     ENABLE ROW LEVEL SECURITY;
 
 -- ============ realtime ============
-ALTER PUBLICATION supabase_realtime ADD TABLE public.pins;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'pins'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.pins;
+  END IF;
+END $$;
 
--- ============ migration: drop legacy emergent OAuth artifacts ============
+-- ============ migration: drop obsolete auth artifacts ============
 DROP TABLE IF EXISTS public.user_sessions;
 ALTER TABLE public.profiles DROP COLUMN IF EXISTS provider;

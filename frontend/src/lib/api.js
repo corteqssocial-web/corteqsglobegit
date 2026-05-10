@@ -1,8 +1,39 @@
 import axios from "axios";
 import { supabase } from "@/lib/supabase";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-export const API = `${BACKEND_URL}/api`;
+const PRODUCTION_HOSTNAME = "globe.corteqs.net";
+
+function getSameOriginApi() {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin}/api`;
+  }
+  return "/api";
+}
+
+function resolveApiBaseUrl() {
+  const configured = (process.env.REACT_APP_BACKEND_URL || "").trim();
+  const sameOriginApi = getSameOriginApi();
+  const currentHostname = typeof window !== "undefined" ? window.location?.hostname : "";
+
+  if (currentHostname === PRODUCTION_HOSTNAME) {
+    return sameOriginApi;
+  }
+
+  if (!configured) {
+    console.warn("REACT_APP_BACKEND_URL is not set. Falling back to same-origin /api.");
+    return sameOriginApi;
+  }
+
+  try {
+    const origin = new URL(configured).origin;
+    return `${origin}/api`;
+  } catch (error) {
+    console.error(`Invalid REACT_APP_BACKEND_URL "${configured}". Falling back to same-origin /api.`, error);
+    return sameOriginApi;
+  }
+}
+
+export const API = resolveApiBaseUrl();
 
 const client = axios.create({
   baseURL: API,

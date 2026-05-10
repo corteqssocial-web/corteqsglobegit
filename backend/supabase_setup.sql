@@ -34,9 +34,20 @@ ALTER TABLE public.pins     ENABLE ROW LEVEL SECURITY;
 
 -- ============ realtime ============
 -- Enable Supabase Realtime on the pins table so frontend can listen to live INSERT/UPDATE/DELETE.
-ALTER PUBLICATION supabase_realtime ADD TABLE public.pins;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'pins'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.pins;
+  END IF;
+END $$;
 
--- ============ migration: drop legacy columns/tables (safe to run multiple times) ============
--- Drop legacy emergent OAuth artifacts if migrating from old schema
+-- ============ migration: drop obsolete auth artifacts (safe to run multiple times) ============
+-- Remove no-longer-used auth migration leftovers from earlier deployments.
 DROP TABLE IF EXISTS public.user_sessions;
 ALTER TABLE public.profiles DROP COLUMN IF EXISTS provider;

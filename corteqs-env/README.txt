@@ -55,10 +55,10 @@ YENİ ORTAMA TAŞIRSAN DEĞİŞTİRİLMESİ GEREKEN ALANLAR
 ------------------------------------------------------
 
 frontend.env:
-  REACT_APP_BACKEND_URL  → yeni backend domain'i
+  REACT_APP_BACKEND_URL  → production public origin (örn. https://globe.corteqs.net)
 
 backend.env:
-  CORS_ORIGINS           → istersen "*" yerine açık domain
+  CORS_ORIGINS           → production public origin
   ADMIN_EMAILS           → yeni kişiler
 
 Diğer her şey aynı kalabilir (Supabase ve Google anahtarları).
@@ -67,16 +67,16 @@ Diğer her şey aynı kalabilir (Supabase ve Google anahtarları).
 HIZLI DOĞRULAMA
 ------------------------------------------------------
 
-# Backend canlı mı?
-curl https://<backend-url>/api/health
+# Frontend origin üstünden backend canlı mı?
+curl https://globe.corteqs.net/api/health
 # → {"ok":true} dönmeli
 
 # Pinler geliyor mu?
-curl https://<backend-url>/api/pins
+curl https://globe.corteqs.net/api/pins
 # → {"pins":[...],"setup_required":false}
 
 # Geo-IP çalışıyor mu?
-curl https://<backend-url>/api/geoip
+curl https://globe.corteqs.net/api/geoip
 # → {"country_code":"...","lat":...,"lng":...}
 
 ------------------------------------------------------
