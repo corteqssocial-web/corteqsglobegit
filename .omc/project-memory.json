@@ -131,14 +131,26 @@
   "hotPaths": [
     {
       "path": "frontend\\src\\App.js",
-      "accessCount": 5,
-      "lastAccessed": 1778414494176,
+      "accessCount": 6,
+      "lastAccessed": 1778415248026,
       "type": "file"
     },
     {
       "path": "frontend\\src\\contexts\\AuthContext.jsx",
+      "accessCount": 6,
+      "lastAccessed": 1778415876262,
+      "type": "file"
+    },
+    {
+      "path": "backend\\server.py",
       "accessCount": 4,
-      "lastAccessed": 1778414477977,
+      "lastAccessed": 1778415863837,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\lib\\api.js",
+      "accessCount": 4,
+      "lastAccessed": 1778415888653,
       "type": "file"
     },
     {
@@ -148,15 +160,57 @@
       "type": "file"
     },
     {
-      "path": "coolifydeploy.md",
-      "accessCount": 1,
-      "lastAccessed": 1778414158900,
-      "type": "file"
+      "path": "frontend",
+      "accessCount": 3,
+      "lastAccessed": 1778415232464,
+      "type": "directory"
+    },
+    {
+      "path": "",
+      "accessCount": 2,
+      "lastAccessed": 1778415217849,
+      "type": "directory"
     },
     {
       "path": "README.md",
+      "accessCount": 2,
+      "lastAccessed": 1778415221765,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\package.json",
+      "accessCount": 2,
+      "lastAccessed": 1778415221999,
+      "type": "file"
+    },
+    {
+      "path": "docker-compose.yaml",
+      "accessCount": 2,
+      "lastAccessed": 1778415237527,
+      "type": "file"
+    },
+    {
+      "path": "backend\\requirements.txt",
+      "accessCount": 2,
+      "lastAccessed": 1778415240960,
+      "type": "file"
+    },
+    {
+      "path": "CLAUDE.md",
+      "accessCount": 2,
+      "lastAccessed": 1778415677221,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\lib\\supabase.js",
+      "accessCount": 2,
+      "lastAccessed": 1778415851231,
+      "type": "file"
+    },
+    {
+      "path": "coolifydeploy.md",
       "accessCount": 1,
-      "lastAccessed": 1778414158927,
+      "lastAccessed": 1778414158900,
       "type": "file"
     },
     {
@@ -166,45 +220,15 @@
       "type": "file"
     },
     {
-      "path": "backend\\server.py",
-      "accessCount": 1,
-      "lastAccessed": 1778414167225,
-      "type": "file"
-    },
-    {
-      "path": "docker-compose.yaml",
-      "accessCount": 1,
-      "lastAccessed": 1778414167339,
-      "type": "file"
-    },
-    {
       "path": "frontend\\src\\components\\DiasporaGlobe.jsx",
       "accessCount": 1,
       "lastAccessed": 1778414174127,
       "type": "file"
     },
     {
-      "path": "frontend\\src\\lib\\api.js",
-      "accessCount": 1,
-      "lastAccessed": 1778414174197,
-      "type": "file"
-    },
-    {
       "path": "frontend\\src\\lib\\pinTypes.js",
       "accessCount": 1,
       "lastAccessed": 1778414181157,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\package.json",
-      "accessCount": 1,
-      "lastAccessed": 1778414181210,
-      "type": "file"
-    },
-    {
-      "path": "backend\\requirements.txt",
-      "accessCount": 1,
-      "lastAccessed": 1778414181251,
       "type": "file"
     },
     {
@@ -220,15 +244,21 @@
       "type": "file"
     },
     {
-      "path": "frontend\\src\\lib\\supabase.js",
-      "accessCount": 1,
-      "lastAccessed": 1778414371509,
-      "type": "file"
-    },
-    {
       "path": "frontend\\src\\index.js",
       "accessCount": 1,
       "lastAccessed": 1778414371552,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\craco.config.js",
+      "accessCount": 1,
+      "lastAccessed": 1778415237244,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\.env.example",
+      "accessCount": 1,
+      "lastAccessed": 1778415254418,
       "type": "file"
     }
   ],

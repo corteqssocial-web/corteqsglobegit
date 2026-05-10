@@ -20,11 +20,15 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      await supabase.auth.getSession();
-      await refresh();
+      // Load persisted session from localStorage
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && mounted) {
+        await refresh();
+      }
       if (mounted) setLoading(false);
     })();
 
+    // Listen for auth state changes (login, logout, token refresh)
     const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
       if (session) {
         refresh();

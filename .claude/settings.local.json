@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm start *)",
+      "Bash(uvicorn server:app --reload --port 8001)"
+    ]
+  }
+}
