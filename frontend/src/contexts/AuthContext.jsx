@@ -25,8 +25,12 @@ export function AuthProvider({ children }) {
       if (mounted) setLoading(false);
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, _session) => {
-      refresh();
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
+      if (session) {
+        refresh();
+      } else {
+        setUser(null);
+      }
     });
 
     return () => {
@@ -57,7 +61,7 @@ export function AuthProvider({ children }) {
   };
 
   const loginGoogle = async () => {
-    const redirectUrl = `${window.location.origin}/`;
+    const redirectUrl = `${window.location.origin}/auth/callback`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {

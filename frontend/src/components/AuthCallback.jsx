@@ -15,24 +15,42 @@ export default function AuthCallback() {
     hasProcessed.current = true;
 
     const hash = window.location.hash || "";
-    const match = hash.match(/session_id=([^&]+)/);
-    if (!match) {
-      navigate("/", { replace: true });
+
+    // Emergent OAuth flow: #session_id=...
+    const emergentMatch = hash.match(/session_id=([^&]+)/);
+    if (emergentMatch) {
+      const sessionId = decodeURIComponent(emergentMatch[1]);
+      (async () => {
+        try {
+          await api.post("/auth/emergent/callback", { session_id: sessionId });
+          window.history.replaceState(null, "", window.location.pathname);
+          await refresh();
+          navigate("/", { replace: true });
+        } catch (e) {
+          setError(e?.response?.data?.detail || e.message || "Auth failed");
+        }
+      })();
       return;
     }
-    const sessionId = decodeURIComponent(match[1]);
 
-    (async () => {
-      try {
-        await api.post("/auth/emergent/callback", { session_id: sessionId });
-        // clear hash
-        window.history.replaceState(null, "", window.location.pathname);
-        await refresh();
-        navigate("/", { replace: true });
-      } catch (e) {
-        setError(e?.response?.data?.detail || e.message || "Auth failed");
-      }
-    })();
+    // Supabase OAuth flow: #access_token=... (detectSessionInUrl handles session automatically)
+    if (hash.includes("access_token=")) {
+      (async () => {
+        try {
+          // Give Supabase client a moment to parse the hash and set the session
+          await new Promise((r) => setTimeout(r, 200));
+          window.history.replaceState(null, "", window.location.pathname);
+          await refresh();
+          navigate("/", { replace: true });
+        } catch (e) {
+          setError(e?.message || "Auth failed");
+        }
+      })();
+      return;
+    }
+
+    // No recognized token — go home
+    navigate("/", { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

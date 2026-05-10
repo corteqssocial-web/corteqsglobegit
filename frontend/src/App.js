@@ -5,6 +5,7 @@ import SearchBar from "@/components/SearchBar";
 import AuthModal from "@/components/AuthModal";
 import AddPinModal from "@/components/AddPinModal";
 import AdminPanel from "@/components/AdminPanel";
+import AuthCallback from "@/components/AuthCallback";
 import PinDetailDrawer from "@/components/PinDetailDrawer";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Toaster } from "@/components/ui/sonner";
@@ -331,6 +332,7 @@ function AppShell() {
   return (
     <Routes>
       <Route path="/" element={<MainScreen />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/admin" element={<AdminPanel />} />
       <Route path="*" element={<MainScreen />} />
     </Routes>
