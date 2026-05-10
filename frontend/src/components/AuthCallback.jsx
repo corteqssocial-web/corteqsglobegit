@@ -31,7 +31,6 @@ export default function AuthCallback() {
     // - Implicit flow: #access_token=... (detectSessionInUrl: true handles automatically)
     // - PKCE flow: ?code=... (Supabase exchanges automatically)
     // Both fire onAuthStateChange when done.
-    const url = window.location.href;
     const hasOAuthParams =
       window.location.hash.includes("access_token=") ||
       window.location.search.includes("code=") ||

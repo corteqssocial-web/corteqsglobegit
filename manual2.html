@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CorteQS Globe Manual 2</title>
+    <style>
+      :root {
+        --bg: #060913;
+        --panel: rgba(13, 16, 28, 0.88);
+        --panel-border: rgba(255, 255, 255, 0.1);
+        --text: #f4f7ff;
+        --muted: rgba(244, 247, 255, 0.68);
+        --accent: #ffd166;
+        --accent-2: #ff6b9d;
+        --ok: #7ce2b0;
+        --warn: #ffb86b;
+        --shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Inter, system-ui, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(53, 79, 140, 0.35), transparent 28%),
+          radial-gradient(circle at bottom right, rgba(255, 107, 157, 0.12), transparent 26%),
+          linear-gradient(180deg, #04070d 0%, #08111f 100%);
+        min-height: 100vh;
+      }
+
+      .wrap {
+        width: min(1100px, calc(100vw - 40px));
+        margin: 40px auto 80px;
+      }
+
+      .hero {
+        padding: 28px 30px;
+        border: 1px solid var(--panel-border);
+        border-radius: 28px;
+        background: var(--panel);
+        backdrop-filter: blur(18px);
+        box-shadow: var(--shadow);
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(255, 209, 102, 0.12);
+        color: var(--accent);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 16px 0 10px;
+        font-size: clamp(30px, 6vw, 52px);
+        line-height: 1.02;
+      }
+
+      .lead {
+        margin: 0;
+        max-width: 820px;
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.6;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 22px;
+        margin-top: 22px;
+      }
+
+      .card {
+        padding: 24px;
+        border: 1px solid var(--panel-border);
+        border-radius: 24px;
+        background: var(--panel);
+        backdrop-filter: blur(18px);
+        box-shadow: var(--shadow);
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        font-size: 22px;
+      }
+
+      h3 {
+        margin: 18px 0 10px;
+        font-size: 16px;
+        color: var(--accent);
+      }
+
+      p,
+      li {
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      ul,
+      ol {
+        margin: 10px 0 0;
+        padding-left: 20px;
+      }
+
+      .code {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.07);
+        color: var(--text);
+        font-family: Consolas, monospace;
+        font-size: 13px;
+      }
+
+      .mini-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 16px;
+      }
+
+      .pill {
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .pill strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--text);
+      }
+
+      .status-ok {
+        color: var(--ok);
+      }
+
+      .status-warn {
+        color: var(--warn);
+      }
+
+      .callout {
+        margin-top: 18px;
+        padding: 18px 20px;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 209, 102, 0.22);
+        background: rgba(255, 209, 102, 0.08);
+      }
+
+      .footer {
+        margin-top: 24px;
+        text-align: center;
+        color: rgba(244, 247, 255, 0.45);
+        font-size: 13px;
+      }
+
+      @media (max-width: 860px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        .mini-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="hero">
+        <div class="eyebrow">CorteQS Globe / Manual 2</div>
+        <h1>Mevcut pin davranışı API değil, etkileşim akışı kaynaklı.</h1>
+        <p class="lead">
+          Son değişikliklerden sonra uygulamadaki beklenen akış şu: <span class="code">cluster</span>
+          tıklanınca harita yakınlaşır, <span class="code">tekil pin</span> tıklanınca ise detay paneli açılır.
+          Tekil pin için yakınlaşma işlemi panel içindeki <span class="code">Buraya yakınlaş</span> butonuyla yapılır.
+        </p>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Sorunun Kaynağı</h2>
+          <p>
+            “Mevcut pine tıklayınca yakınlaşmıyor” gözlemi, şu anki kodun beklenen davranışıyla uyumlu.
+            Bu yüzden ilk bakışta sorun backend API, Supabase ya da geocoding tarafında görünmüyor.
+          </p>
+
+          <h3>Gerçekte ne oluyor?</h3>
+          <ol>
+            <li><span class="code">DiasporaGlobe.jsx</span> içinde tekil pin tıklaması <span class="code">onPinClick</span> çağırıyor.</li>
+            <li><span class="code">App.js</span> içindeki <span class="code">onPinClick</span> sadece drawer açıyor.</li>
+            <li>Yakınlaşma, <span class="code">PinDetailDrawer.jsx</span> içindeki butona basılınca tetikleniyor.</li>
+            <li>Cluster tıklaması ise ayrı bir akışla doğrudan <span class="code">flyTo(...)</span> çalıştırıyor.</li>
+          </ol>
+
+          <div class="callout">
+            <strong class="status-ok">Sonuç</strong>
+            <p>
+              Bu davranış bir veri çekme problemi değil. API bozuk olsaydı pin açılması, drawer içeriği veya koordinat
+              bilgisi de tutarsız olurdu. Burada esas fark, tekil pin ve cluster için iki farklı UX kuralı yazılmış olması.
+            </p>
+          </div>
+        </article>
+
+        <aside class="card">
+          <h2>Mevcut Davranış Özeti</h2>
+
+          <div class="mini-grid">
+            <div class="pill">
+              <strong>Tekil pin tıkla</strong>
+              <span class="status-warn">Yakınlaşmaz</span>
+              <p>Detay drawer açılır.</p>
+            </div>
+            <div class="pill">
+              <strong>Cluster tıkla</strong>
+              <span class="status-ok">Yakınlaşır</span>
+              <p>Harita kümeye doğru zoom yapar.</p>
+            </div>
+            <div class="pill">
+              <strong>Drawer butonu</strong>
+              <span class="status-ok">Yakınlaşır</span>
+              <p><span class="code">Buraya yakınlaş</span> ile fly-to çalışır.</p>
+            </div>
+            <div class="pill">
+              <strong>API etkisi</strong>
+              <span class="status-ok">Düşük</span>
+              <p>Bu spesifik yakınlaşma şikayetinin ana nedeni değil.</p>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Manual 2 Yorumu</h2>
+          <p>
+            Bu belge, mevcut sistemin gerçek davranışını yanlış beklenti oluşturmadan anlatmak için hazırlandı.
+            Eğer önceki <span class="code">manual.html</span> içinde “pine tıkla ve yakınlaş” gibi bir ifade varsa,
+            o metin artık güncel kod davranışıyla uyuşmuyor olabilir.
+          </p>
+
+          <h3>Güncel kullanım dili böyle olmalı</h3>
+          <ul>
+            <li>“Cluster’a tıklarsan yakınlaşırsın.”</li>
+            <li>“Tek bir pine tıklarsan detay açılır.”</li>
+            <li>“Detay panelinden `Buraya yakınlaş` seçeneği ile o noktaya gidersin.”</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>İstersen Sonraki Kod Değişikliği</h2>
+          <p>
+            Eğer ürün beklentin gerçekten “tek pine tıklayınca hem drawer açılsın hem de kamera otomatik yakınlaşsın” ise,
+            bu API değişikliği değil, frontend etkileşim değişikliğidir.
+          </p>
+
+          <h3>Gerekli frontend değişikliği</h3>
+          <ul>
+            <li><span class="code">App.js</span> içindeki <span class="code">onPinClick</span> fonksiyonuna <span class="code">setFlyToCoords(...)</span> eklenmeli.</li>
+            <li>Ardından drawer yine açılabilir.</li>
+            <li>Böylece tek tıkta hem odaklanma hem detay görünümü gelir.</li>
+          </ul>
+
+          <div class="callout">
+            <strong class="status-warn">Şu anki ürün kuralı</strong>
+            <p>
+              Tekil pin tıklaması ile cluster tıklaması aynı davranışı göstermiyor. Bu yüzden kullanıcının
+              “yakınlaşması gerekirken saçmalıyor” hissi yaşaması anlaşılır.
+            </p>
+          </div>
+        </article>
+      </section>
+
+      <p class="footer">
+        Not: Repo içinde bir <span class="code">manual.html</span> dosyası bulunamadı; bu yüzden <span class="code">manual2.html</span>
+        mevcut uygulama koduna bakılarak sıfırdan güncel davranış dokümanı olarak hazırlandı.
+      </p>
+    </main>
+  </body>
+</html>
