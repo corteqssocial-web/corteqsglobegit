@@ -1,13 +1,15 @@
 import {
   buildClusterFlyToTarget,
   buildFlyToState,
+  GLOBE_LONGITUDE_OFFSET_DEG,
   MAX_GLOBE_ZOOM,
   MIN_GLOBE_ZOOM,
+  normalizeAngle,
 } from "./flyToCommands";
 
 function latLngTo3D(lat, lng, r = 1) {
   const phi = (90 - lat) * (Math.PI / 180);
-  const theta = lng * (Math.PI / 180);
+  const theta = (lng + GLOBE_LONGITUDE_OFFSET_DEG) * (Math.PI / 180);
 
   return {
     x: r * Math.sin(phi) * Math.sin(theta),
@@ -48,8 +50,8 @@ describe("flyToCommands", () => {
     );
 
     expect(state.targetRotationX).toBeCloseTo(0.9166, 3);
-    expect(state.targetRotationY).toBeCloseTo(-0.2339, 3);
-    expect(state.finalRotationY).toBeCloseTo(-0.2339, 3);
+    expect(state.targetRotationY).toBeCloseTo(1.3369, 3);
+    expect(state.finalRotationY).toBeCloseTo(1.3369, 3);
     expect(state.targetZoom).toBe(1.7);
   });
 
@@ -100,8 +102,7 @@ describe("flyToCommands", () => {
       1.7
     );
 
-    expect(Math.abs(state.finalRotationY + 3.1241)).toBeLessThan(0.2);
-    expect(Math.abs(state.finalRotationY - (-3.05))).toBeLessThan(0.2);
+    expect(Math.abs(normalizeAngle(state.finalRotationY) - (-1.5533))).toBeLessThan(0.2);
   });
 
   it("clamps zoom requests into the supported camera range", () => {

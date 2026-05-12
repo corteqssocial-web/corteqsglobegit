@@ -31,9 +31,10 @@ SUPABASE_ANON_KEY = os.environ["SUPABASE_ANON_KEY"]
 SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY") or os.environ.get("GOOGLE_GEOCODING_API_KEY")
 ADMIN_EMAILS = [e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
-DEFAULT_AUTOCOMPLETE_REGIONS = [
-    "tr", "de", "fr", "nl", "be", "gb", "us", "ca", "at", "se", "dk", "no", "ch", "au",
-]
+# Bias autocomplete toward the diaspora corridor, but do NOT restrict — otherwise
+# cities outside the list (Tokyo, Dubai, Cairo, São Paulo, …) cannot be found or
+# get resolved to a same-named place in one of the allowed countries.
+DEFAULT_AUTOCOMPLETE_REGIONS: list[str] = []
 
 # Service role client bypasses RLS — used for ALL data ops (never touch .auth on this!)
 sb: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
@@ -254,13 +255,14 @@ async def fetch_google_location_results(query: str) -> List[dict]:
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         async def autocomplete_for(primary_type: str) -> List[dict]:
-            payload = {
+            payload: dict = {
                 "input": query,
                 "includedPrimaryTypes": [primary_type],
-                "includedRegionCodes": DEFAULT_AUTOCOMPLETE_REGIONS,
                 "languageCode": "tr",
                 "sessionToken": session_token,
             }
+            if DEFAULT_AUTOCOMPLETE_REGIONS:
+                payload["includedRegionCodes"] = DEFAULT_AUTOCOMPLETE_REGIONS
             response = await client.post(
                 "https://places.googleapis.com/v1/places:autocomplete",
                 json=payload,

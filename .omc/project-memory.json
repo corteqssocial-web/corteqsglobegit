@@ -1,11 +1,26 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1778414124989,
-  "projectRoot": "c:\\temp_private\\corteqs\\corteqs_globe",
+  "lastScanned": 1778590646885,
+  "projectRoot": "C:\\temp_private\\corteqs\\corteqs_globe",
   "techStack": {
-    "languages": [],
-    "frameworks": [],
-    "packageManager": null,
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "@playwright/test",
+        "version": "1.60.0",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "npm",
     "runtime": null
   },
   "build": {
@@ -25,6 +40,7 @@
     "isMonorepo": false,
     "workspaces": [],
     "mainDirectories": [
+      "scripts",
       "tests"
     ],
     "gitBranches": {
@@ -37,21 +53,21 @@
     "backend": {
       "path": "backend",
       "purpose": null,
-      "fileCount": 8,
-      "lastAccessed": 1778414124960,
+      "fileCount": 9,
+      "lastAccessed": 1778590646811,
       "keyFiles": [
+        "backfill_locations.py",
         "Dockerfile",
         "p1_setup.sql",
         "realtime_enable.sql",
-        "requirements.txt",
-        "server.py"
+        "requirements.txt"
       ]
     },
     "corteqs-env": {
       "path": "corteqs-env",
       "purpose": null,
       "fileCount": 6,
-      "lastAccessed": 1778414124961,
+      "lastAccessed": 1778590646812,
       "keyFiles": [
         "backend.env",
         "frontend.env",
@@ -64,7 +80,7 @@
       "path": "frontend",
       "purpose": null,
       "fileCount": 13,
-      "lastAccessed": 1778414124961,
+      "lastAccessed": 1778590646847,
       "keyFiles": [
         "components.json",
         "craco.config.js",
@@ -76,17 +92,35 @@
     "memory": {
       "path": "memory",
       "purpose": null,
-      "fileCount": 2,
-      "lastAccessed": 1778414124962,
+      "fileCount": 3,
+      "lastAccessed": 1778590646848,
       "keyFiles": [
+        "MEMORY.md",
         "PRD.md"
       ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 2,
+      "lastAccessed": 1778590646848,
+      "keyFiles": [
+        "production-smoke.md",
+        "production-smoke.ps1"
+      ]
+    },
+    "test-results": {
+      "path": "test-results",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1778590646849,
+      "keyFiles": []
     },
     "tests": {
       "path": "tests",
       "purpose": "Test files",
       "fileCount": 1,
-      "lastAccessed": 1778414124962,
+      "lastAccessed": 1778590646849,
       "keyFiles": [
         "__init__.py"
       ]
@@ -95,7 +129,7 @@
       "path": "test_reports",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1778414124963,
+      "lastAccessed": 1778590646850,
       "keyFiles": [
         "iteration_1.json",
         "iteration_2.json"
@@ -105,7 +139,7 @@
       "path": "backend\\tests",
       "purpose": "Test files",
       "fileCount": 1,
-      "lastAccessed": 1778414124963,
+      "lastAccessed": 1778590646851,
       "keyFiles": [
         "backend_test.py"
       ]
@@ -114,7 +148,7 @@
       "path": "frontend\\build",
       "purpose": "Build output",
       "fileCount": 2,
-      "lastAccessed": 1778414124964,
+      "lastAccessed": 1778590646852,
       "keyFiles": [
         "asset-manifest.json",
         "index.html"
@@ -124,201 +158,63 @@
       "path": "frontend\\node_modules",
       "purpose": "Dependencies",
       "fileCount": 1,
-      "lastAccessed": 1778414124966,
+      "lastAccessed": 1778590646855,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
       "path": "backend\\server.py",
-      "accessCount": 23,
-      "lastAccessed": 1778418363706,
+      "accessCount": 8,
+      "lastAccessed": 1778591807044,
       "type": "file"
     },
     {
-      "path": "coolifydeploy.md",
-      "accessCount": 12,
-      "lastAccessed": 1778418341574,
+      "path": "frontend/src",
+      "accessCount": 2,
+      "lastAccessed": 1778591732720,
+      "type": "directory"
+    },
+    {
+      "path": "backend/server.py",
+      "accessCount": 2,
+      "lastAccessed": 1778591757169,
+      "type": "directory"
+    },
+    {
+      "path": "frontend\\src\\lib\\flyToCommands.js",
+      "accessCount": 1,
+      "lastAccessed": 1778591721618,
       "type": "file"
     },
     {
-      "path": "memory\\MEMORY.md",
-      "accessCount": 10,
-      "lastAccessed": 1778418318727,
+      "path": "frontend\\src\\lib\\citySearch.js",
+      "accessCount": 1,
+      "lastAccessed": 1778591721922,
       "type": "file"
     },
     {
-      "path": "frontend\\src\\contexts\\AuthContext.jsx",
-      "accessCount": 9,
-      "lastAccessed": 1778417269318,
+      "path": "frontend\\src\\components\\SearchBar.jsx",
+      "accessCount": 1,
+      "lastAccessed": 1778591722646,
       "type": "file"
+    },
+    {
+      "path": "frontend\\src\\lib\\flyToCommands.test.js",
+      "accessCount": 1,
+      "lastAccessed": 1778591722886,
+      "type": "file"
+    },
+    {
+      "path": "backend",
+      "accessCount": 1,
+      "lastAccessed": 1778591733497,
+      "type": "directory"
     },
     {
       "path": "frontend\\src\\App.js",
-      "accessCount": 9,
-      "lastAccessed": 1778417928349,
-      "type": "file"
-    },
-    {
-      "path": "CLAUDE.md",
-      "accessCount": 9,
-      "lastAccessed": 1778418121957,
-      "type": "file"
-    },
-    {
-      "path": "",
-      "accessCount": 7,
-      "lastAccessed": 1778418348640,
-      "type": "directory"
-    },
-    {
-      "path": "frontend\\src\\lib\\api.js",
-      "accessCount": 6,
-      "lastAccessed": 1778417916129,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\src\\components\\AuthCallback.jsx",
-      "accessCount": 6,
-      "lastAccessed": 1778419013896,
-      "type": "file"
-    },
-    {
-      "path": "memory\\PRD.md",
-      "accessCount": 5,
-      "lastAccessed": 1778418281404,
-      "type": "file"
-    },
-    {
-      "path": "README.md",
-      "accessCount": 4,
-      "lastAccessed": 1778418132229,
-      "type": "file"
-    },
-    {
-      "path": "frontend",
-      "accessCount": 3,
-      "lastAccessed": 1778415232464,
-      "type": "directory"
-    },
-    {
-      "path": "frontend\\package.json",
-      "accessCount": 3,
-      "lastAccessed": 1778417880163,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\.env.example",
-      "accessCount": 3,
-      "lastAccessed": 1778418194967,
-      "type": "file"
-    },
-    {
-      "path": "backend\\supabase_setup.sql",
-      "accessCount": 3,
-      "lastAccessed": 1778418355786,
-      "type": "file"
-    },
-    {
-      "path": "corteqs-env\\supabase_setup.sql",
-      "accessCount": 3,
-      "lastAccessed": 1778418356797,
-      "type": "file"
-    },
-    {
-      "path": "issue.png",
-      "accessCount": 3,
-      "lastAccessed": 1778418936091,
-      "type": "file"
-    },
-    {
-      "path": "docker-compose.yaml",
-      "accessCount": 2,
-      "lastAccessed": 1778415237527,
-      "type": "file"
-    },
-    {
-      "path": "backend\\requirements.txt",
-      "accessCount": 2,
-      "lastAccessed": 1778415240960,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\src\\lib\\supabase.js",
-      "accessCount": 2,
-      "lastAccessed": 1778415851231,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\src\\components\\AuthModal.jsx",
-      "accessCount": 2,
-      "lastAccessed": 1778417249336,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\public\\index.html",
-      "accessCount": 2,
-      "lastAccessed": 1778417874841,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\craco.config.js",
-      "accessCount": 2,
-      "lastAccessed": 1778417892471,
-      "type": "file"
-    },
-    {
-      "path": "backend\\tests\\backend_test.py",
-      "accessCount": 2,
-      "lastAccessed": 1778418067655,
-      "type": "file"
-    },
-    {
-      "path": "backend\\.env.example",
-      "accessCount": 2,
-      "lastAccessed": 1778418154478,
-      "type": "file"
-    },
-    {
-      "path": "backend\\.env",
-      "accessCount": 2,
-      "lastAccessed": 1778418175062,
-      "type": "file"
-    },
-    {
-      "path": ".env.production",
-      "accessCount": 2,
-      "lastAccessed": 1778418183973,
-      "type": "file"
-    },
-    {
-      "path": ".env.local",
-      "accessCount": 2,
-      "lastAccessed": 1778418189988,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\src\\components\\DiasporaGlobe.jsx",
       "accessCount": 1,
-      "lastAccessed": 1778414174127,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\src\\lib\\pinTypes.js",
-      "accessCount": 1,
-      "lastAccessed": 1778414181157,
-      "type": "file"
-    },
-    {
-      "path": "frontend\\src\\index.js",
-      "accessCount": 1,
-      "lastAccessed": 1778414371552,
-      "type": "file"
-    },
-    {
-      "path": "issue2.png",
-      "accessCount": 1,
-      "lastAccessed": 1778419183504,
+      "lastAccessed": 1778591739330,
       "type": "file"
     }
   ],
