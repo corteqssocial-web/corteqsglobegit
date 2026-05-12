@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 
 const SESSION_TIMEOUT_MS = 15000;
 const SESSION_POLL_INTERVAL_MS = 250;
+const REFRESH_TIMEOUT_MS = 5000;
 
 function getOAuthPayload() {
   const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
@@ -30,6 +31,17 @@ async function waitForSession(timeoutMs = SESSION_TIMEOUT_MS) {
   return null;
 }
 
+async function waitForRefresh(refresh) {
+  try {
+    await Promise.race([
+      refresh(),
+      new Promise((resolve) => setTimeout(resolve, REFRESH_TIMEOUT_MS)),
+    ]);
+  } catch (error) {
+    console.warn("Auth callback refresh failed:", error);
+  }
+}
+
 export default function AuthCallback() {
   const navigate = useNavigate();
   const { refresh } = useAuth();
@@ -51,7 +63,8 @@ export default function AuthCallback() {
       try {
         // Clean URL (remove hash and query params)
         window.history.replaceState(null, "", window.location.pathname);
-        await refresh();
+        await waitForRefresh(refresh);
+        if (!isActive) return;
         navigate("/", { replace: true });
       } catch (e) {
         setError(e?.message || "Auth failed");

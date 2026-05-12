@@ -125,6 +125,26 @@ describe("AuthCallback", () => {
     expect(container.textContent).toContain("Giriş başarısız");
     expect(container.textContent).toContain("Oturum kurulamadı (timeout). Lütfen tekrar deneyin.");
   });
+
+  it("redirects home even if refresh hangs after the session is created", async () => {
+    refreshMock.mockImplementation(() => new Promise(() => {}));
+
+    supabase.auth.getSession
+      .mockResolvedValueOnce({ data: { session: null } })
+      .mockResolvedValueOnce({ data: { session: { access_token: "test-access" } } });
+
+    await renderComponent();
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      jest.advanceTimersByTime(6000);
+      await Promise.resolve();
+    });
+
+    expect(supabase.auth.setSession).toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true });
+  });
 });
 
 const SESSION_TIMEOUT_FOR_TEST = 16000;
