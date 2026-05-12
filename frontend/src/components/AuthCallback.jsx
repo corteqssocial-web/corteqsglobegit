@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 
+const SESSION_TIMEOUT_MS = 15000;
+const SESSION_POLL_INTERVAL_MS = 250;
+
 function getOAuthPayload() {
   const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
   const search = new URLSearchParams(window.location.search);
@@ -15,6 +18,18 @@ function getOAuthPayload() {
   };
 }
 
+async function waitForSession(timeoutMs = SESSION_TIMEOUT_MS) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) return session;
+    await new Promise((resolve) => setTimeout(resolve, SESSION_POLL_INTERVAL_MS));
+  }
+
+  return null;
+}
+
 export default function AuthCallback() {
   const navigate = useNavigate();
   const { refresh } = useAuth();
@@ -25,10 +40,14 @@ export default function AuthCallback() {
     if (hasProcessed.current) return;
     hasProcessed.current = true;
 
-    let timeoutId;
     let unsubscribe;
+    let isActive = true;
+    let isFinishing = false;
 
     const finish = async () => {
+      if (!isActive || isFinishing) return;
+      isFinishing = true;
+
       try {
         // Clean URL (remove hash and query params)
         window.history.replaceState(null, "", window.location.pathname);
@@ -60,17 +79,12 @@ export default function AuthCallback() {
 
     // Subscribe to auth state changes; finish when session is established
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" || (session && event === "TOKEN_REFRESHED")) {
-        if (timeoutId) clearTimeout(timeoutId);
-        unsubscribe?.();
+      if (session && (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION")) {
         finish();
       }
     });
     unsubscribe = () => data?.subscription?.unsubscribe?.();
 
-    // Fallback:
-    // 1) explicitly set/exchange the session if URL payload exists and Supabase hasn't done it yet
-    // 2) then immediately check whether a session is available
     (async () => {
       try {
         const { data: { session: existingSession } } = await supabase.auth.getSession();
@@ -88,27 +102,20 @@ export default function AuthCallback() {
           }
         }
 
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = existingSession || await waitForSession();
         if (session) {
-          if (timeoutId) clearTimeout(timeoutId);
-          unsubscribe?.();
-          finish();
+          await finish();
+          return;
         }
+
+        setError("Oturum kurulamadı (timeout). Lütfen tekrar deneyin.");
       } catch (sessionError) {
-        if (timeoutId) clearTimeout(timeoutId);
-        unsubscribe?.();
         setError(sessionError?.message || "Oturum kurulamadı.");
       }
     })();
 
-    // Hard timeout after 8 seconds — show error if still no session
-    timeoutId = setTimeout(() => {
-      unsubscribe?.();
-      setError("Oturum kurulamadı (timeout). Lütfen tekrar deneyin.");
-    }, 8000);
-
     return () => {
-      if (timeoutId) clearTimeout(timeoutId);
+      isActive = false;
       unsubscribe?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
