@@ -20,12 +20,23 @@ CREATE TABLE IF NOT EXISTS public.pins (
   hood        TEXT DEFAULT '',
   lat         DOUBLE PRECISION NOT NULL,
   lng         DOUBLE PRECISION NOT NULL,
+  location_label TEXT,
+  canonical_city TEXT,
+  country_code TEXT,
+  provider    TEXT,
+  provider_id TEXT,
   status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
   user_id     TEXT REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_pins_status ON public.pins(status);
 CREATE INDEX IF NOT EXISTS idx_pins_type   ON public.pins(type);
+
+ALTER TABLE public.pins ADD COLUMN IF NOT EXISTS location_label TEXT;
+ALTER TABLE public.pins ADD COLUMN IF NOT EXISTS canonical_city TEXT;
+ALTER TABLE public.pins ADD COLUMN IF NOT EXISTS country_code TEXT;
+ALTER TABLE public.pins ADD COLUMN IF NOT EXISTS provider TEXT;
+ALTER TABLE public.pins ADD COLUMN IF NOT EXISTS provider_id TEXT;
 
 -- Backend uses SERVICE_ROLE key which bypasses RLS — no policies needed.
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;

@@ -4,6 +4,7 @@ import { PIN_TYPES } from "@/lib/pinTypes";
 import { buildClusterFlyToTarget, buildFlyToState, MAX_GLOBE_ZOOM, MIN_GLOBE_ZOOM } from "@/lib/flyToCommands";
 
 const GLOBE_RADIUS = 1;
+const OVERLAP_THRESHOLD_PX = 14;
 
 function latLngTo3D(lat, lng, r = GLOBE_RADIUS) {
   const phi = (90 - lat) * (Math.PI / 180);
@@ -20,6 +21,11 @@ function toScreen(world, camera, w, h) {
 }
 function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function projectLatLng(lat, lng, globe, camera, w, h) {
+  const point = latLngTo3D(lat, lng, GLOBE_RADIUS * 1.015);
+  if (point.applyEuler && globe?.rotation) point.applyEuler(globe.rotation);
+  return toScreen(point, camera, w, h);
+}
 
 // ---------- Clustering ----------
 function clusterPins(pins, radiusDeg) {
@@ -74,9 +80,12 @@ export default function DiasporaGlobe({
   const pinchRef = useRef({ active: false, dist: 0 });
   const flyAnimationFrameRef = useRef(null);
   const flyAnimationTokenRef = useRef(0);
+  const clusterResolveTimerRef = useRef(null);
 
   const [hovered, setHovered] = useState(null);
   const [zoomZ, setZoomZ] = useState(2.8);
+  const [expandedCluster, setExpandedCluster] = useState(null);
+  const [overlapPanel, setOverlapPanel] = useState(null);
 
   useEffect(() => { filterRef.current = filter; }, [filter]);
 
@@ -91,6 +100,10 @@ export default function DiasporaGlobe({
   }, [pins, filter, zoomZ]);
 
   useEffect(() => { clustersRef.current = clusters; }, [clusters]);
+  useEffect(() => {
+    setExpandedCluster(null);
+    setOverlapPanel(null);
+  }, [filter, pins]);
 
   // ----- Three.js init (mount once) -----
   useEffect(() => {
@@ -196,6 +209,7 @@ export default function DiasporaGlobe({
     window.addEventListener("resize", onResize);
 
     return () => {
+      if (clusterResolveTimerRef.current) clearTimeout(clusterResolveTimerRef.current);
       if (flyAnimationFrameRef.current != null) {
         cancelAnimationFrame(flyAnimationFrameRef.current);
         flyAnimationFrameRef.current = null;
@@ -250,7 +264,13 @@ export default function DiasporaGlobe({
       mouseNDC.current.x = ((clientX - rect.left) / rect.width) * 2 - 1;
       mouseNDC.current.y = -((clientY - rect.top) / rect.height) * 2 + 1;
     };
-    const beginInteract = () => { autoRotate.current = false; if (dragTimer.current) clearTimeout(dragTimer.current); };
+    const beginInteract = () => {
+      autoRotate.current = false;
+      setExpandedCluster(null);
+      setOverlapPanel(null);
+      if (clusterResolveTimerRef.current) clearTimeout(clusterResolveTimerRef.current);
+      if (dragTimer.current) clearTimeout(dragTimer.current);
+    };
     const endInteract = () => {
       if (dragTimer.current) clearTimeout(dragTimer.current);
       dragTimer.current = setTimeout(() => { autoRotate.current = true; }, 3500);
@@ -435,19 +455,97 @@ export default function DiasporaGlobe({
   // Hover tooltip target
   const hoveredCluster = useMemo(() => clusters.find((c) => c.id === hovered), [clusters, hovered]);
 
+  const buildSpiderfyLayout = useCallback((cluster) => {
+    const t = threeRef.current;
+    if (!t.camera || !t.globe) return null;
+    const { W, H } = sizeRef.current;
+    const projectedCenter = projectLatLng(cluster.lat, cluster.lng, t.globe, t.camera, W, H);
+
+    const projectedPins = cluster.pins.map((pin) => {
+      return {
+        pin,
+        screen: projectLatLng(pin.lat, pin.lng, t.globe, t.camera, W, H),
+      };
+    });
+
+    const hasExactOverlap = cluster.pins.some((pin, index) =>
+      cluster.pins.slice(index + 1).some((other) =>
+        Math.abs(pin.lat - other.lat) < 0.00001 && Math.abs(pin.lng - other.lng) < 0.00001
+      )
+    );
+    const hasScreenOverlap = projectedPins.some((entry, index) =>
+      projectedPins.slice(index + 1).some((other) =>
+        Math.hypot(entry.screen.x - other.screen.x, entry.screen.y - other.screen.y) < OVERLAP_THRESHOLD_PX
+      )
+    );
+
+    if (hasExactOverlap) {
+      return {
+        mode: "panel",
+        cluster,
+        position: projectedCenter,
+      };
+    }
+
+    if (!hasScreenOverlap) {
+      return { mode: "none" };
+    }
+
+    const radius = clamp(24 + cluster.pins.length * 8, 34, 86);
+    const items = cluster.pins.map((pin, index) => {
+      const angle = (-Math.PI / 2) + (index / cluster.pins.length) * Math.PI * 2;
+      return {
+        pin,
+        x: projectedCenter.x + Math.cos(angle) * radius,
+        y: projectedCenter.y + Math.sin(angle) * radius,
+      };
+    });
+
+    return {
+      mode: "spiderfy",
+      clusterId: cluster.id,
+      center: projectedCenter,
+      items,
+    };
+  }, []);
+
+  const resolveClusterInteraction = useCallback((cluster) => {
+    const next = buildSpiderfyLayout(cluster);
+    if (!next || next.mode === "none") {
+      setExpandedCluster(null);
+      setOverlapPanel(null);
+      return;
+    }
+    if (next.mode === "panel") {
+      setExpandedCluster(null);
+      setOverlapPanel(next);
+      return;
+    }
+    setOverlapPanel(null);
+    setExpandedCluster(next);
+  }, [buildSpiderfyLayout]);
+
   const onClusterClick = (c) => {
     if (c.pins.length === 1) {
       onPinClick?.(c.pins[0]);
       return;
     }
+    setExpandedCluster(null);
+    setOverlapPanel(null);
     const currentZ = threeRef.current?.camera?.position?.z ?? zoomZ;
     const target = buildClusterFlyToTarget(c, currentZ);
     flyTo({ lat: target.lat, lng: target.lng }, target.zoom);
+    if (clusterResolveTimerRef.current) clearTimeout(clusterResolveTimerRef.current);
+    clusterResolveTimerRef.current = setTimeout(() => {
+      resolveClusterInteraction(c);
+    }, 360);
   };
 
   return (
     <div ref={mountRef} className="absolute inset-0 select-none" data-testid="globe-canvas-mount" style={{ touchAction: "none" }}>
       {clusters.map((c) => {
+        if (expandedCluster?.clusterId === c.id) return null;
+        if (overlapPanel?.cluster?.id === c.id) return null;
         if (c.pins.length === 1) {
           const p = c.pins[0];
           const t = PIN_TYPES[p.type] || PIN_TYPES.person;
@@ -501,6 +599,66 @@ export default function DiasporaGlobe({
           </div>
         );
       })}
+
+      {expandedCluster?.items?.map((item) => {
+        const t = PIN_TYPES[item.pin.type] || PIN_TYPES.person;
+        return (
+          <button
+            key={`spider-${item.pin.id}`}
+            type="button"
+            data-testid={`spider-pin-${item.pin.id}`}
+            className="globe-spider-pin"
+            style={{
+              left: `${item.x}px`,
+              top: `${item.y}px`,
+              borderColor: t.color,
+              color: t.color,
+              "--pin-color": t.color,
+            }}
+            onClick={() => {
+              setExpandedCluster(null);
+              onPinClick?.(item.pin);
+            }}
+          >
+            <span className="pin-emoji">{t.emoji}</span>
+          </button>
+        );
+      })}
+
+      {overlapPanel?.cluster && (
+        <div
+          data-testid="cluster-overlap-panel"
+          className="absolute right-6 top-1/2 z-30 w-[min(320px,calc(100vw-48px))] -translate-y-1/2 rounded-2xl border border-white/10 bg-[#0b0d14]/92 p-3 backdrop-blur-md"
+        >
+          <div className="px-2 pb-2">
+            <div className="text-sm font-medium text-white">{overlapPanel.cluster.pins.length} pin bu bölgede</div>
+            <div className="text-xs text-white/45">Koordinatlar çok yakın olduğu için listeden seçebilirsin.</div>
+          </div>
+          <div className="flex max-h-[280px] flex-col gap-2 overflow-auto">
+            {overlapPanel.cluster.pins.map((pin) => {
+              const type = PIN_TYPES[pin.type] || PIN_TYPES.person;
+              return (
+                <button
+                  key={`overlap-${pin.id}`}
+                  type="button"
+                  data-testid={`overlap-pin-${pin.id}`}
+                  onClick={() => {
+                    setOverlapPanel(null);
+                    onPinClick?.(pin);
+                  }}
+                  className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-left transition hover:bg-white/[0.06]"
+                >
+                  <span className="text-lg">{type.emoji}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm text-white">{pin.name}</span>
+                    <span className="block truncate text-xs text-white/45">{pin.hood ? `${pin.hood}, ` : ""}{pin.city}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {hoveredCluster && (
         <ClusterTooltip cluster={hoveredCluster} />

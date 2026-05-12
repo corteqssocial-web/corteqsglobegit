@@ -19,6 +19,8 @@ import logging
 import uuid
 import httpx
 import jwt as pyjwt
+import re
+import unicodedata
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -51,6 +53,11 @@ class PinIn(BaseModel):
     lng: float
     description: Optional[str] = ""
     image_url: Optional[str] = ""
+    location_label: Optional[str] = ""
+    canonical_city: Optional[str] = ""
+    country_code: Optional[str] = ""
+    provider: Optional[str] = ""
+    provider_id: Optional[str] = ""
 
 
 class PinOut(BaseModel):
@@ -64,6 +71,11 @@ class PinOut(BaseModel):
     status: str
     created_at: str
     user_id: Optional[str] = None
+    location_label: Optional[str] = ""
+    canonical_city: Optional[str] = ""
+    country_code: Optional[str] = ""
+    provider: Optional[str] = ""
+    provider_id: Optional[str] = ""
 
 
 class SignupIn(BaseModel):
@@ -89,11 +101,156 @@ class UserOut(BaseModel):
     is_admin: bool = False
 
 
+class LocationResultOut(BaseModel):
+    label: str
+    city: str
+    region: str = ""
+    country: str = ""
+    country_code: str = ""
+    lat: float
+    lng: float
+    provider: str
+    provider_id: str = ""
+    precision: str
+    canonical_name: str
+
+
 # ---------- Helpers ----------
 def is_admin_email(email: Optional[str]) -> bool:
     if not email:
         return False
     return email.lower() in ADMIN_EMAILS
+
+
+def normalize_search_text(value: Optional[str]) -> str:
+    cleaned = unicodedata.normalize("NFD", (value or "").strip().lower())
+    cleaned = "".join(ch for ch in cleaned if unicodedata.category(ch) != "Mn")
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned
+
+
+def canonicalize_city_name(value: Optional[str]) -> str:
+    normalized = normalize_search_text(value)
+    return " ".join(part.capitalize() for part in normalized.split())
+
+
+def score_location_result(result: dict, normalized_query: str) -> int:
+    normalized_city = normalize_search_text(result.get("city"))
+    normalized_label = normalize_search_text(result.get("label"))
+    normalized_region = normalize_search_text(result.get("region"))
+    precision = result.get("precision")
+
+    if normalized_city == normalized_query:
+        return 0
+    if normalized_city.startswith(normalized_query):
+        return 10
+    if normalized_label.startswith(normalized_query):
+        return 20
+    if normalized_city and normalized_query in normalized_city:
+        return 30
+    if normalized_region == normalized_query:
+        return 45
+    if normalized_label and normalized_query in normalized_label:
+        return 55
+    if precision == "region":
+        return 75
+    return 100
+
+
+def classify_precision(components: List[dict]) -> str:
+    component_types = {t for component in components for t in component.get("types", [])}
+    if {"street_number", "route"} & component_types or {"premise", "subpremise"} & component_types:
+        return "address"
+    if {"locality", "postal_town"} & component_types:
+        return "city"
+    if {"sublocality", "sublocality_level_1", "neighborhood", "administrative_area_level_2"} & component_types:
+        return "district"
+    return "region"
+
+
+def component_value(components: List[dict], *wanted_types: str) -> str:
+    for component in components:
+        types = set(component.get("types", []))
+        if types.intersection(wanted_types):
+            return component.get("long_name", "")
+    return ""
+
+
+def map_google_result(item: dict) -> Optional[dict]:
+    loc = item.get("geometry", {}).get("location", {})
+    lat = loc.get("lat")
+    lng = loc.get("lng")
+    if lat is None or lng is None:
+        return None
+
+    components = item.get("address_components", [])
+    city = (
+        component_value(components, "locality", "postal_town")
+        or component_value(components, "administrative_area_level_3")
+        or component_value(components, "administrative_area_level_2")
+    )
+    region = component_value(components, "administrative_area_level_1")
+    country = component_value(components, "country")
+    country_code = ""
+    for component in components:
+        if "country" in component.get("types", []):
+            country_code = component.get("short_name", "")
+            break
+
+    precision = classify_precision(components)
+    if precision == "region" and not city:
+        city = region
+
+    canonical_name = canonicalize_city_name(city or region)
+    if not canonical_name:
+        return None
+
+    return {
+        "label": item.get("formatted_address", ""),
+        "city": city or region,
+        "region": region,
+        "country": country,
+        "country_code": country_code,
+        "lat": lat,
+        "lng": lng,
+        "provider": "google",
+        "provider_id": item.get("place_id", ""),
+        "precision": precision,
+        "canonical_name": canonical_name,
+    }
+
+
+def dedupe_location_results(results: List[dict]) -> List[dict]:
+    deduped = []
+    seen = set()
+    for result in results:
+        key = (
+            normalize_search_text(result.get("canonical_name")),
+            result.get("country_code", ""),
+            result.get("precision", ""),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(result)
+    return deduped
+
+
+async def fetch_google_location_results(query: str) -> List[dict]:
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        response = await client.get(
+            "https://maps.googleapis.com/maps/api/geocode/json",
+            params={"address": query, "key": GOOGLE_GEOCODING_API_KEY},
+        )
+    if response.status_code != 200:
+        raise HTTPException(status_code=502, detail="Geocoding failed")
+
+    data = response.json()
+    if data.get("status") not in ("OK", "ZERO_RESULTS"):
+        raise HTTPException(status_code=502, detail=data.get("status", "GEOCODE_ERROR"))
+
+    mapped = [map_google_result(item) for item in data.get("results", [])[:10]]
+    return [item for item in mapped if item]
 
 
 async def ensure_profile(user_id: str, email: str, name: str = "", picture: str = "") -> dict:
@@ -300,6 +457,11 @@ async def create_pin(body: PinIn, user: dict = Depends(require_user)):
         "lng": body.lng,
         "description": (body.description or "").strip(),
         "image_url": (body.image_url or "").strip(),
+        "location_label": (body.location_label or "").strip(),
+        "canonical_city": canonicalize_city_name(body.canonical_city or body.city),
+        "country_code": (body.country_code or "").strip().upper(),
+        "provider": (body.provider or "").strip(),
+        "provider_id": (body.provider_id or "").strip(),
         "status": "pending",
         "user_id": user["id"],
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -383,44 +545,46 @@ async def delete_pin(pin_id: str, request: Request):
 
 
 # ---------- Routes: Geocoding ----------
+@api.get("/locations/search")
+async def search_locations(q: str = Query(..., min_length=1, max_length=120)):
+    """Canonical location search backed by provider adapters."""
+    normalized_query = normalize_search_text(q)
+    if not normalized_query:
+        return {"results": []}
+
+    raw_results = await fetch_google_location_results(q)
+    scored = []
+    for result in raw_results:
+        score = score_location_result(result, normalized_query)
+        result["score"] = score
+        if result["precision"] not in {"city", "district", "region"}:
+            continue
+        if score >= 100:
+            continue
+        scored.append(result)
+
+    scored.sort(key=lambda item: (item["score"], item["precision"] == "region", item["label"]))
+    deduped = dedupe_location_results(scored)[:6]
+    cleaned = [{key: value for key, value in item.items() if key != "score"} for item in deduped]
+    return {"results": cleaned}
+
+
 @api.get("/geocode")
 async def geocode(q: str = Query(..., min_length=1, max_length=120)):
-    """Proxy to Google Geocoding API. Returns top results with city + lat/lng."""
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        r = await client.get(
-            "https://maps.googleapis.com/maps/api/geocode/json",
-            params={"address": q, "key": GOOGLE_GEOCODING_API_KEY},
-        )
-    if r.status_code != 200:
-        raise HTTPException(status_code=502, detail="Geocoding failed")
-    data = r.json()
-    if data.get("status") not in ("OK", "ZERO_RESULTS"):
-        raise HTTPException(status_code=502, detail=data.get("status", "GEOCODE_ERROR"))
-    results = []
-    for item in data.get("results", [])[:8]:
-        loc = item.get("geometry", {}).get("location", {})
-        comps = item.get("address_components", [])
-        city = ""
-        country = ""
-        for c in comps:
-            types = c.get("types", [])
-            if "locality" in types or "postal_town" in types:
-                city = c.get("long_name", "")
-            if "country" in types:
-                country = c.get("long_name", "")
-        if not city and comps:
-            for c in comps:
-                if "administrative_area_level_1" in c.get("types", []):
-                    city = c.get("long_name", "")
-                    break
-        results.append({
-            "label": item.get("formatted_address", ""),
-            "city": city,
-            "country": country,
-            "lat": loc.get("lat"),
-            "lng": loc.get("lng"),
-        })
-    return {"results": results}
+    """Backward-compatible alias for older frontend consumers."""
+    response = await search_locations(q)
+    return {
+        "results": [
+            {
+                "label": item["label"],
+                "city": item["city"],
+                "country": item["country"],
+                "lat": item["lat"],
+                "lng": item["lng"],
+            }
+            for item in response["results"]
+        ]
+    }
 
 
 # ---------- Routes: Seed sample pins (one-time use) ----------

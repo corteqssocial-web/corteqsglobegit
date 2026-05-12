@@ -195,12 +195,18 @@ const clusterPins = [
   { id: 3, name: "Paris B", city: "Paris", type: "event", lat: 48.857, lng: 2.3526 },
 ];
 
+const exactOverlapPins = [
+  { id: 4, name: "Twin A", city: "Berlin", type: "person", lat: 52.52, lng: 13.405 },
+  { id: 5, name: "Twin B", city: "Berlin", type: "business", lat: 52.52, lng: 13.405 },
+];
+
 describe("DiasporaGlobe interactions", () => {
   let container;
   let root;
   let rafSpy;
 
   beforeEach(() => {
+    jest.useFakeTimers();
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -217,6 +223,8 @@ describe("DiasporaGlobe interactions", () => {
       root.unmount();
     });
     container.remove();
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
     jest.restoreAllMocks();
     delete globalThis.__THREE_LAST_CAMERA__;
   });
@@ -273,6 +281,44 @@ describe("DiasporaGlobe interactions", () => {
 
     expect(onPinClick).not.toHaveBeenCalled();
     expect(camera.position.z).toBeLessThan(startingZ);
+  });
+
+  it("spiderfies overlapping cluster members after zooming in", async () => {
+    await renderGlobe({
+      pins: clusterPins,
+      onPinClick: jest.fn(),
+    });
+
+    await act(async () => {
+      container.querySelector('[data-testid^="cluster-"]').click();
+      jest.advanceTimersByTime(400);
+    });
+
+    expect(container.querySelector('[data-testid="spider-pin-2"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="spider-pin-3"]')).not.toBeNull();
+  });
+
+  it("falls back to the overlap panel for pins with the same coordinates", async () => {
+    const onPinClick = jest.fn();
+
+    await renderGlobe({
+      pins: exactOverlapPins,
+      onPinClick,
+    });
+
+    await act(async () => {
+      container.querySelector('[data-testid^="cluster-"]').click();
+      jest.advanceTimersByTime(400);
+    });
+
+    const panel = container.querySelector('[data-testid="cluster-overlap-panel"]');
+    expect(panel).not.toBeNull();
+
+    await act(async () => {
+      container.querySelector('[data-testid="overlap-pin-4"]').click();
+    });
+
+    expect(onPinClick).toHaveBeenCalledWith(exactOverlapPins[0]);
   });
 
   it("replays the fly-to path when the same coordinates arrive as a fresh command", async () => {

@@ -1,12 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Search, Loader2 } from "lucide-react";
 import api from "@/lib/api";
-import {
-  findExactLocalCity,
-  formatCityLabel,
-  getLocalCityMatches,
-  rankRemoteGeocodeResults,
-} from "@/lib/citySearch";
 
 export default function SearchBar({ onFly }) {
   const [q, setQ] = useState("");
@@ -25,30 +19,17 @@ export default function SearchBar({ onFly }) {
       return;
     }
     debounceRef.current = setTimeout(async () => {
-      // First: local CITIES match
-      const matches = getLocalCityMatches(q, 3);
-      const exactLocal = findExactLocalCity(q);
-      if (exactLocal) {
-        setResults([{
-          label: exactLocal.label,
-          city: exactLocal.key,
-          lat: exactLocal.lat,
-          lng: exactLocal.lng,
-          source: "local",
-        }]);
-        setOpen(true);
-        return;
-      }
-      // Then: geocode
+      setBusy(true);
       try {
-        const res = await api.get("/geocode", { params: { q } });
-        const remote = rankRemoteGeocodeResults(res.data.results || [], q, matches);
-        const combined = [...matches, ...remote].slice(0, 6);
-        setResults(combined);
-        setOpen(combined.length > 0);
+        const res = await api.get("/locations/search", { params: { q } });
+        const nextResults = res.data.results || [];
+        setResults(nextResults);
+        setOpen(nextResults.length > 0);
       } catch {
-        setResults(matches);
-        setOpen(matches.length > 0);
+        setResults([]);
+        setOpen(false);
+      } finally {
+        setBusy(false);
       }
     }, 280);
   }, [q]);
@@ -56,23 +37,14 @@ export default function SearchBar({ onFly }) {
   const submit = async (e) => {
     e?.preventDefault?.();
     if (!q.trim()) return;
-    const localCity = findExactLocalCity(q);
-    if (localCity) {
-      onFly({ lat: localCity.lat, lng: localCity.lng });
-      ignoreRef.current = true;
-      setQ(localCity.label);
-      setOpen(false);
-      return;
-    }
-    // Fall back to geocode (first result)
     setBusy(true);
     try {
-      const res = await api.get("/geocode", { params: { q } });
+      const res = await api.get("/locations/search", { params: { q } });
       const first = res.data.results?.[0];
       if (first) {
         onFly({ lat: first.lat, lng: first.lng });
         ignoreRef.current = true;
-        setQ(first.city || first.label);
+        setQ(first.city || first.canonical_name || first.label);
       }
     } finally { setBusy(false); setOpen(false); }
   };
@@ -80,7 +52,7 @@ export default function SearchBar({ onFly }) {
   const pick = (r) => {
     onFly({ lat: r.lat, lng: r.lng });
     ignoreRef.current = true;
-    setQ(r.city ? formatCityLabel(r.city) : r.label);
+    setQ(r.city || r.canonical_name || r.label);
     setOpen(false);
   };
 
@@ -109,7 +81,7 @@ export default function SearchBar({ onFly }) {
             >
               <div className="text-sm text-white">{r.label}</div>
               <div className="text-xs text-white/40">
-                {r.country ? `${r.country} · ` : ""}{r.lat?.toFixed(2)}, {r.lng?.toFixed(2)} {r.source === "local" && "· hızlı"}
+                {r.country ? `${r.country} · ` : ""}{r.precision ? `${r.precision} · ` : ""}{r.lat?.toFixed(2)}, {r.lng?.toFixed(2)}
               </div>
             </button>
           ))}

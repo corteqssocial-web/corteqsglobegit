@@ -84,11 +84,24 @@ def test_auth_me_authenticated():
 def test_create_pin():
     if "access_token" not in state:
         pytest.skip("no token")
-    payload = {"type": "business", "name": "TEST_Cafe", "city": "Berlin", "hood": "Mitte", "lat": 52.52, "lng": 13.405}
+    payload = {
+        "type": "business",
+        "name": "TEST_Cafe",
+        "city": "Berlin",
+        "hood": "Mitte",
+        "lat": 52.52,
+        "lng": 13.405,
+        "location_label": "Berlin, Germany",
+        "canonical_city": "Berlin",
+        "country_code": "DE",
+        "provider": "google",
+        "provider_id": "berlin-1",
+    }
     r = requests.post(f"{API}/pins", json=payload, headers=auth_headers(), timeout=20)
     assert r.status_code == 200, r.text
     pin = r.json()["pin"]
     assert pin["status"] == "pending"
+    assert pin["canonical_city"] == "Berlin"
     state["pin_id"] = pin["id"]
 
 
@@ -111,14 +124,16 @@ def test_pins_mine():
     assert state["pin_id"] in ids
 
 
-# ---------- Geocoding ----------
-def test_geocode():
-    r = requests.get(f"{API}/geocode", params={"q": "Istanbul"}, timeout=20)
+# ---------- Canonical location search ----------
+def test_location_search():
+    r = requests.get(f"{API}/locations/search", params={"q": "Istanbul"}, timeout=20)
     assert r.status_code == 200, r.text
     results = r.json()["results"]
     assert len(results) > 0
     first = results[0]
     assert "lat" in first and "lng" in first
+    assert "canonical_name" in first
+    assert first["provider"] == "google"
     assert isinstance(first["lat"], (int, float))
 
 

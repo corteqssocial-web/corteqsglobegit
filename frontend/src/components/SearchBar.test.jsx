@@ -49,6 +49,25 @@ describe("SearchBar", () => {
     const input = container.querySelector('[data-testid="search-input"]');
     const form = input.closest("form");
 
+    api.get.mockResolvedValue({
+      data: {
+        results: [
+          {
+            label: "Ankara, Turkey",
+            city: "Ankara",
+            canonical_name: "Ankara",
+            country: "Turkey",
+            country_code: "TR",
+            precision: "city",
+            lat: 39.93,
+            lng: 32.85,
+            provider: "google",
+            provider_id: "ankara-1",
+          },
+        ],
+      },
+    });
+
     await act(async () => {
       setInputValue(input, "Ankara");
     });
@@ -57,17 +76,39 @@ describe("SearchBar", () => {
       form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
 
-    expect(api.get).not.toHaveBeenCalled();
+    expect(api.get).toHaveBeenCalledWith("/locations/search", { params: { q: "Ankara" } });
     expect(onFly).toHaveBeenCalledWith({ lat: 39.93, lng: 32.85 });
     expect(input.value).toBe("Ankara");
   });
 
-  it("keeps the local match first when remote geocode returns noisier Ankara results", async () => {
+  it("shows canonical backend results and filters out noisy matches upstream", async () => {
     api.get.mockResolvedValue({
       data: {
         results: [
-          { city: "Ankara Province", label: "Ankara Province, Turkey", lat: 39.95, lng: 32.86 },
-          { city: "Austin", label: "Austin, TX, USA", lat: 30.26, lng: -97.74 },
+          {
+            city: "Ankara",
+            label: "Ankara, Turkey",
+            canonical_name: "Ankara",
+            country: "Turkey",
+            country_code: "TR",
+            precision: "city",
+            lat: 39.93,
+            lng: 32.85,
+            provider: "google",
+            provider_id: "ankara-city",
+          },
+          {
+            city: "Ankara Province",
+            label: "Ankara Province, Turkey",
+            canonical_name: "Ankara Province",
+            country: "Turkey",
+            country_code: "TR",
+            precision: "region",
+            lat: 39.95,
+            lng: 32.86,
+            provider: "google",
+            provider_id: "ankara-region",
+          },
         ],
       },
     });
@@ -88,9 +129,9 @@ describe("SearchBar", () => {
     expect(firstResult).not.toBeNull();
     const resultText = firstResult.textContent;
 
-    expect(api.get).toHaveBeenCalledWith("/geocode", { params: { q: "ank" } });
+    expect(api.get).toHaveBeenCalledWith("/locations/search", { params: { q: "ank" } });
     expect(resultText).toContain("Ankara");
-    expect(resultText).toContain("hızlı");
+    expect(resultText).toContain("city");
     expect(container.textContent).not.toContain("Austin, TX, USA");
   });
 });
