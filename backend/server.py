@@ -2,7 +2,7 @@
 
 Auth: Supabase Email/Password + Supabase Google OAuth (frontend handles via supabase-js + JWT verification on backend).
 DB: Supabase (Postgres). Tables: profiles, pins.
-Geocoding: Google Geocoding API proxied server-side.
+Location search: Google Places API (New) proxied server-side.
 """
 
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Query, UploadFile, File
@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 import os
 import logging
 import uuid
+import asyncio
 import httpx
 import jwt as pyjwt
 import re
@@ -28,8 +29,11 @@ load_dotenv(ROOT_DIR / ".env")
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_ANON_KEY = os.environ["SUPABASE_ANON_KEY"]
 SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
-GOOGLE_GEOCODING_API_KEY = os.environ["GOOGLE_GEOCODING_API_KEY"]
+GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY") or os.environ.get("GOOGLE_GEOCODING_API_KEY")
 ADMIN_EMAILS = [e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
+DEFAULT_AUTOCOMPLETE_REGIONS = [
+    "tr", "de", "fr", "nl", "be", "gb", "us", "ca", "at", "se", "dk", "no", "ch", "au",
+]
 
 # Service role client bypasses RLS — used for ALL data ops (never touch .auth on this!)
 sb: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
@@ -172,18 +176,18 @@ def component_value(components: List[dict], *wanted_types: str) -> str:
     for component in components:
         types = set(component.get("types", []))
         if types.intersection(wanted_types):
-            return component.get("long_name", "")
+            return component.get("longText", "") or component.get("long_name", "")
     return ""
 
 
-def map_google_result(item: dict) -> Optional[dict]:
-    loc = item.get("geometry", {}).get("location", {})
-    lat = loc.get("lat")
-    lng = loc.get("lng")
+def map_google_place_details(item: dict, prediction_text: str = "") -> Optional[dict]:
+    loc = item.get("location", {})
+    lat = loc.get("latitude")
+    lng = loc.get("longitude")
     if lat is None or lng is None:
         return None
 
-    components = item.get("address_components", [])
+    components = item.get("addressComponents", [])
     city = (
         component_value(components, "locality", "postal_town")
         or component_value(components, "administrative_area_level_3")
@@ -201,12 +205,13 @@ def map_google_result(item: dict) -> Optional[dict]:
     if precision == "region" and not city:
         city = region
 
-    canonical_name = canonicalize_city_name(city or region)
+    label = item.get("formattedAddress", "") or prediction_text
+    canonical_name = canonicalize_city_name(city or region or prediction_text)
     if not canonical_name:
         return None
 
     return {
-        "label": item.get("formatted_address", ""),
+        "label": label,
         "city": city or region,
         "region": region,
         "country": country,
@@ -214,7 +219,7 @@ def map_google_result(item: dict) -> Optional[dict]:
         "lat": lat,
         "lng": lng,
         "provider": "google",
-        "provider_id": item.get("place_id", ""),
+        "provider_id": item.get("id", ""),
         "precision": precision,
         "canonical_name": canonical_name,
     }
@@ -237,19 +242,69 @@ def dedupe_location_results(results: List[dict]) -> List[dict]:
 
 
 async def fetch_google_location_results(query: str) -> List[dict]:
+    if not GOOGLE_MAPS_API_KEY:
+        raise HTTPException(status_code=500, detail="Missing GOOGLE_MAPS_API_KEY")
+
+    session_token = uuid.uuid4().hex
+    autocomplete_headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
+        "X-Goog-FieldMask": "suggestions.placePrediction.placeId,suggestions.placePrediction.text.text",
+    }
+
     async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.get(
-            "https://maps.googleapis.com/maps/api/geocode/json",
-            params={"address": query, "key": GOOGLE_GEOCODING_API_KEY},
-        )
-    if response.status_code != 200:
-        raise HTTPException(status_code=502, detail="Geocoding failed")
+        async def autocomplete_for(primary_type: str) -> List[dict]:
+            payload = {
+                "input": query,
+                "includedPrimaryTypes": [primary_type],
+                "includedRegionCodes": DEFAULT_AUTOCOMPLETE_REGIONS,
+                "languageCode": "tr",
+                "sessionToken": session_token,
+            }
+            response = await client.post(
+                "https://places.googleapis.com/v1/places:autocomplete",
+                json=payload,
+                headers=autocomplete_headers,
+            )
+            if response.status_code != 200:
+                raise HTTPException(status_code=502, detail=f"Places autocomplete failed: {response.text}")
+            suggestions = response.json().get("suggestions", [])
+            return [
+                suggestion.get("placePrediction")
+                for suggestion in suggestions
+                if suggestion.get("placePrediction", {}).get("placeId")
+            ][:5]
 
-    data = response.json()
-    if data.get("status") not in ("OK", "ZERO_RESULTS"):
-        raise HTTPException(status_code=502, detail=data.get("status", "GEOCODE_ERROR"))
+        place_predictions = await autocomplete_for("(cities)")
+        if not place_predictions:
+            place_predictions = await autocomplete_for("(regions)")
+        if not place_predictions:
+            return []
 
-    mapped = [map_google_result(item) for item in data.get("results", [])[:10]]
+        async def fetch_place_details(prediction: dict) -> Optional[dict]:
+            place_id = prediction.get("placeId")
+            if not place_id:
+                return None
+            details_headers = {
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
+                "X-Goog-FieldMask": "id,formattedAddress,addressComponents,location,types",
+            }
+            details_response = await client.get(
+                f"https://places.googleapis.com/v1/places/{place_id}",
+                headers=details_headers,
+                params={"sessionToken": session_token},
+            )
+            if details_response.status_code != 200:
+                log.warning("Place details failed for %s: %s", place_id, details_response.text)
+                return None
+            return map_google_place_details(
+                details_response.json(),
+                prediction.get("text", {}).get("text", ""),
+            )
+
+        mapped = await asyncio.gather(*(fetch_place_details(prediction) for prediction in place_predictions))
+
     return [item for item in mapped if item]
 
 
