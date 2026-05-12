@@ -375,6 +375,17 @@ export default function DiasporaGlobe({
     const sx = t.globe.rotation.x;
     const sz = t.camera.position.z;
     const tz = zoomTarget != null ? clamp(zoomTarget, 1.25, 5.5) : Math.max(1.55, sz - 0.5);
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("corteqs:fly-to", {
+        detail: {
+          lat: coords.lat,
+          lng: coords.lng,
+          zoom: tz,
+        },
+      }));
+    }
+
     let p = 0;
     const fly = () => {
       p = Math.min(p + 0.025, 1);

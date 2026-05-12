@@ -18,6 +18,8 @@ node_modules/
 
 # Testing
 /coverage
+test-results/
+playwright-report/
 
 # Next.js
 /.next/
@@ -41,6 +43,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 dump.rdb
+frontend-e2e.log
+frontend-e2e.err.log
 
 # System files
 .DS_Store
