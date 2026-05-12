@@ -297,4 +297,20 @@ describe("DiasporaGlobe interactions", () => {
     expect(afterFirstCommand).toBeGreaterThan(initialRafCalls);
     expect(rafSpy.mock.calls.length).toBeGreaterThan(afterFirstCommand);
   });
+
+  it("cancels the in-flight fly-to animation before starting a new one", async () => {
+    const cancelSpy = jest.spyOn(window, "cancelAnimationFrame");
+
+    await renderGlobe({
+      pins: [singlePin],
+      flyToCommand: { id: 1, lat: singlePin.lat, lng: singlePin.lng, zoom: 1.7, source: "pin-drawer" },
+    });
+
+    await renderGlobe({
+      pins: [singlePin],
+      flyToCommand: { id: 2, lat: 41.01, lng: 28.96, zoom: 1.7, source: "search" },
+    });
+
+    expect(cancelSpy).toHaveBeenCalled();
+  });
 });

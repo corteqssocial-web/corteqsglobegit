@@ -72,6 +72,8 @@ export default function DiasporaGlobe({
   const mouseNDC = useRef({ x: -10, y: -10 });
   const prevHover = useRef(null);
   const pinchRef = useRef({ active: false, dist: 0 });
+  const flyAnimationFrameRef = useRef(null);
+  const flyAnimationTokenRef = useRef(0);
 
   const [hovered, setHovered] = useState(null);
   const [zoomZ, setZoomZ] = useState(2.8);
@@ -194,6 +196,11 @@ export default function DiasporaGlobe({
     window.addEventListener("resize", onResize);
 
     return () => {
+      if (flyAnimationFrameRef.current != null) {
+        cancelAnimationFrame(flyAnimationFrameRef.current);
+        flyAnimationFrameRef.current = null;
+      }
+      if (dragTimer.current) clearTimeout(dragTimer.current);
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
       try { mount.removeChild(renderer.domElement); } catch {}
@@ -364,7 +371,14 @@ export default function DiasporaGlobe({
   const flyTo = useCallback((coords, zoomTarget) => {
     const t = threeRef.current;
     if (!t.globe || !t.camera) return;
+    if (flyAnimationFrameRef.current != null) {
+      cancelAnimationFrame(flyAnimationFrameRef.current);
+      flyAnimationFrameRef.current = null;
+    }
+    flyAnimationTokenRef.current += 1;
+    const animationToken = flyAnimationTokenRef.current;
     autoRotate.current = false;
+    if (dragTimer.current) clearTimeout(dragTimer.current);
     const sy = t.globe.rotation.y;
     const sx = t.globe.rotation.x;
     const sz = t.camera.position.z;
@@ -387,13 +401,20 @@ export default function DiasporaGlobe({
 
     let p = 0;
     const fly = () => {
+      if (animationToken !== flyAnimationTokenRef.current) return;
       p = Math.min(p + 0.025, 1);
       const e = easeOutCubic(p);
       t.globe.rotation.y = sy + (finalRotationY - sy) * e;
       t.globe.rotation.x = sx + (targetRotationX - sx) * e;
       t.camera.position.z = sz + (targetZoom - sz) * e;
-      if (p < 1) requestAnimationFrame(fly);
+      if (p < 1) {
+        flyAnimationFrameRef.current = requestAnimationFrame(fly);
+      }
       else {
+        t.globe.rotation.y = finalRotationY;
+        t.globe.rotation.x = targetRotationX;
+        t.camera.position.z = targetZoom;
+        flyAnimationFrameRef.current = null;
         if (dragTimer.current) clearTimeout(dragTimer.current);
         dragTimer.current = setTimeout(() => { autoRotate.current = true; }, 6000);
       }

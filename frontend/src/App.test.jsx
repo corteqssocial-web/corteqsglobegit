@@ -61,7 +61,19 @@ jest.mock("@/components/PinDetailDrawer", () => function PinDetailDrawerMock({ p
   );
 });
 
-jest.mock("@/components/SearchBar", () => () => <div data-testid="search-bar" />);
+jest.mock("@/components/SearchBar", () => function SearchBarMock({ onFly }) {
+  return (
+    <div data-testid="search-bar">
+      <button
+        data-testid="mock-search-fly"
+        type="button"
+        onClick={() => onFly?.({ lat: 39.93, lng: 32.85 })}
+      >
+        search
+      </button>
+    </div>
+  );
+});
 jest.mock("@/components/AuthModal", () => () => null);
 jest.mock("@/components/AddPinModal", () => () => null);
 jest.mock("@/components/AdminPanel", () => () => null);
@@ -92,6 +104,7 @@ describe("MainScreen fly-to wiring", () => {
   let root;
 
   beforeEach(() => {
+    jest.useFakeTimers();
     latestGlobeProps = null;
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -125,6 +138,8 @@ describe("MainScreen fly-to wiring", () => {
       await flushPromises();
     });
     container.remove();
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
     jest.clearAllMocks();
   });
 
@@ -202,5 +217,42 @@ describe("MainScreen fly-to wiring", () => {
       zoom: 1.7,
     });
     expect(latestGlobeProps.flyToCommand.id).not.toBe(firstCommandId);
+  });
+
+  it("does not let the delayed geoip fly-to override a manual search fly-to", async () => {
+    api.get.mockImplementation((url) => {
+      if (url === "/pins") {
+        return Promise.resolve({ data: { pins: [TEST_PIN] } });
+      }
+      if (url === "/geoip") {
+        return Promise.resolve({ data: { lat: 10, lng: 20, city: "Geo City", country_name: "Geo Country" } });
+      }
+      return Promise.resolve({ data: {} });
+    });
+
+    await renderScreen();
+
+    await act(async () => {
+      container.querySelector('[data-testid="mock-search-fly"]').click();
+      await flushPromises();
+    });
+
+    expect(latestGlobeProps.searchFlyToCommand).toMatchObject({
+      lat: 39.93,
+      lng: 32.85,
+      source: "search",
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(1500);
+      await flushPromises();
+    });
+
+    expect(latestGlobeProps.flyToCommand).toBeNull();
+    expect(latestGlobeProps.searchFlyToCommand).toMatchObject({
+      lat: 39.93,
+      lng: 32.85,
+      source: "search",
+    });
   });
 });

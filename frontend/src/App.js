@@ -37,7 +37,17 @@ export function MainScreen() {
   const [drawerPin, setDrawerPin] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const userRef = useRef(null);
+  const geoIpTimeoutRef = useRef(null);
+  const manualFlyToTriggeredRef = useRef(false);
   useEffect(() => { userRef.current = user; }, [user]);
+
+  const cancelPendingGeoIpFlyTo = useCallback(() => {
+    manualFlyToTriggeredRef.current = true;
+    if (geoIpTimeoutRef.current) {
+      clearTimeout(geoIpTimeoutRef.current);
+      geoIpTimeoutRef.current = null;
+    }
+  }, []);
 
   const markArrived = useCallback((id) => {
     setArrivedIds((prev) => {
@@ -108,6 +118,7 @@ export function MainScreen() {
           const me = userRef.current;
           if (me && np.user_id === me.id) {
             toast.success(`🎉 Pin'in onaylandı: ${np.name}`, { duration: 6000 });
+            cancelPendingGeoIpFlyTo();
             dispatchFlyToCommand(np, { zoom: PIN_FLY_TO_ZOOM, source: "approval" });
           } else if (t) {
             toast(`${t.emoji} Onaylandı: ${np.name} · ${np.city}`);
@@ -129,7 +140,7 @@ export function MainScreen() {
       Object.values(arrivedTimers.current).forEach(clearTimeout);
       arrivedTimers.current = {};
     };
-  }, [dispatchFlyToCommand, markArrived]);
+  }, [cancelPendingGeoIpFlyTo, dispatchFlyToCommand, markArrived]);
 
   // Auto-seed if globe is empty and user is admin (handy for first-run)
   useEffect(() => {
@@ -141,8 +152,9 @@ export function MainScreen() {
   }, [user, pins.length, loadPins]);
 
   const onFly = useCallback((coords) => {
+    cancelPendingGeoIpFlyTo();
     dispatchSearchFlyToCommand(coords, { source: "search" });
-  }, [dispatchSearchFlyToCommand]);
+  }, [cancelPendingGeoIpFlyTo, dispatchSearchFlyToCommand]);
 
   const onGlobeClick = useCallback((coords) => {
     if (!addMode) return;
@@ -171,15 +183,23 @@ export function MainScreen() {
         const { lat, lng, city, country_name } = res.data || {};
         if (lat != null && lng != null) {
           // Defer briefly so Three.js initial setup is ready
-          setTimeout(() => {
+          geoIpTimeoutRef.current = setTimeout(() => {
             if (cancelled) return;
+            if (manualFlyToTriggeredRef.current) return;
             dispatchFlyToCommand({ lat, lng }, { source: "geoip" });
             if (city) toast(`🌍 ${city}${country_name ? `, ${country_name}` : ""}`, { duration: 3000 });
+            geoIpTimeoutRef.current = null;
           }, 1200);
         }
       } catch { /* silent */ }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (geoIpTimeoutRef.current) {
+        clearTimeout(geoIpTimeoutRef.current);
+        geoIpTimeoutRef.current = null;
+      }
+    };
   }, [dispatchFlyToCommand]);
 
   const counts = useMemo(() => {
@@ -310,6 +330,7 @@ export function MainScreen() {
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         onFlyTo={(p) => {
+          cancelPendingGeoIpFlyTo();
           dispatchFlyToCommand(p, { zoom: PIN_FLY_TO_ZOOM, source: "pin-drawer" });
           setDrawerOpen(false);
         }}
