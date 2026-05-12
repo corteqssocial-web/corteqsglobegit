@@ -2,7 +2,11 @@ export const PIN_FLY_TO_ZOOM = 1.7;
 export const MIN_GLOBE_ZOOM = 1.25;
 export const MAX_GLOBE_ZOOM = 5.5;
 export const MAX_GLOBE_TILT = 1.3;
-export const GLOBE_LONGITUDE_OFFSET_DEG = -90;
+// +90 aligns latLngTo3D with the earth-blue-marble.jpg texture mapped onto a default
+// Three.js SphereGeometry, where Greenwich (lng=0) sits on the +X axis and lng=-90 (Pacific)
+// faces the camera at globe.rotation.y=0. Using -90 here mirrors every city 180° around the
+// Y axis, so searches for Ankara, Tokyo, etc. land on the antipode (mid-Pacific) instead.
+export const GLOBE_LONGITUDE_OFFSET_DEG = 90;
 
 export function buildFlyToCommand(coords, id, options = {}) {
   if (coords?.lat == null || coords?.lng == null) return null;

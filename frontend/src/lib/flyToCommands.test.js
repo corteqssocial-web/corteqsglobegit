@@ -50,8 +50,8 @@ describe("flyToCommands", () => {
     );
 
     expect(state.targetRotationX).toBeCloseTo(0.9166, 3);
-    expect(state.targetRotationY).toBeCloseTo(1.3369, 3);
-    expect(state.finalRotationY).toBeCloseTo(1.3369, 3);
+    expect(state.targetRotationY).toBeCloseTo(-1.8047, 3);
+    expect(state.finalRotationY).toBeCloseTo(-1.8047, 3);
     expect(state.targetZoom).toBe(1.7);
   });
 
@@ -102,7 +102,7 @@ describe("flyToCommands", () => {
       1.7
     );
 
-    expect(Math.abs(normalizeAngle(state.finalRotationY) - (-1.5533))).toBeLessThan(0.2);
+    expect(Math.abs(normalizeAngle(state.finalRotationY) - 1.5883)).toBeLessThan(0.2);
   });
 
   it("clamps zoom requests into the supported camera range", () => {

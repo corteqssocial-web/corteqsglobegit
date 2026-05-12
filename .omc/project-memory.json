@@ -170,6 +170,18 @@
       "type": "file"
     },
     {
+      "path": "frontend\\src\\components\\DiasporaGlobe.jsx",
+      "accessCount": 3,
+      "lastAccessed": 1778592198258,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\lib\\flyToCommands.test.js",
+      "accessCount": 3,
+      "lastAccessed": 1778592442499,
+      "type": "file"
+    },
+    {
       "path": "frontend/src",
       "accessCount": 2,
       "lastAccessed": 1778591732720,
@@ -182,9 +194,15 @@
       "type": "directory"
     },
     {
+      "path": "frontend\\src\\App.js",
+      "accessCount": 2,
+      "lastAccessed": 1778592148756,
+      "type": "file"
+    },
+    {
       "path": "frontend\\src\\lib\\flyToCommands.js",
-      "accessCount": 1,
-      "lastAccessed": 1778591721618,
+      "accessCount": 2,
+      "lastAccessed": 1778592428176,
       "type": "file"
     },
     {
@@ -200,22 +218,28 @@
       "type": "file"
     },
     {
-      "path": "frontend\\src\\lib\\flyToCommands.test.js",
-      "accessCount": 1,
-      "lastAccessed": 1778591722886,
-      "type": "file"
-    },
-    {
       "path": "backend",
       "accessCount": 1,
       "lastAccessed": 1778591733497,
       "type": "directory"
     },
     {
-      "path": "frontend\\src\\App.js",
+      "path": "issue.png",
       "accessCount": 1,
-      "lastAccessed": 1778591739330,
+      "lastAccessed": 1778592111510,
       "type": "file"
+    },
+    {
+      "path": "issue2.png",
+      "accessCount": 1,
+      "lastAccessed": 1778592111822,
+      "type": "file"
+    },
+    {
+      "path": "frontend/src/components/DiasporaGlobe.jsx",
+      "accessCount": 1,
+      "lastAccessed": 1778592190493,
+      "type": "directory"
     }
   ],
   "userDirectives": []

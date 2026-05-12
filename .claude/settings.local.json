@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npm start *)",
       "Bash(uvicorn server:app --reload --port 8001)",
-      "Bash(python -m py_compile backend/server.py)"
+      "Bash(python -m py_compile backend/server.py)",
+      "Bash(npx craco *)"
     ]
   }
 }
