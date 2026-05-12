@@ -122,7 +122,10 @@ export default function DiasporaGlobe({
     mount.appendChild(renderer.domElement);
 
     const globe = new THREE.Group();
-    globe.rotation.order = "YXZ";
+    // XYZ order: vertices get Ry first, then Rx — matches buildFlyToState's longitude-then-latitude
+    // math (and the centering tests). YXZ here breaks fly-to latitude: e.g. searching "İstanbul"
+    // lands on Sudan because Rx is applied before Ry, leaving the target far from screen center.
+    globe.rotation.order = "XYZ";
     scene.add(globe);
 
     const earthMat = new THREE.MeshPhongMaterial({ color: 0x1a3d78, shininess: 18, specular: 0x222244 });

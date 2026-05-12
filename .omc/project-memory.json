@@ -171,8 +171,8 @@
     },
     {
       "path": "frontend\\src\\components\\DiasporaGlobe.jsx",
-      "accessCount": 3,
-      "lastAccessed": 1778592198258,
+      "accessCount": 4,
+      "lastAccessed": 1778593124851,
       "type": "file"
     },
     {
@@ -206,6 +206,12 @@
       "type": "file"
     },
     {
+      "path": "issue.png",
+      "accessCount": 2,
+      "lastAccessed": 1778592931691,
+      "type": "file"
+    },
+    {
       "path": "frontend\\src\\lib\\citySearch.js",
       "accessCount": 1,
       "lastAccessed": 1778591721922,
@@ -222,12 +228,6 @@
       "accessCount": 1,
       "lastAccessed": 1778591733497,
       "type": "directory"
-    },
-    {
-      "path": "issue.png",
-      "accessCount": 1,
-      "lastAccessed": 1778592111510,
-      "type": "file"
     },
     {
       "path": "issue2.png",
