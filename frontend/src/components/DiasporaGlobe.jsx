@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import * as THREE from "three";
-import { PIN_TYPES, CITIES } from "@/lib/pinTypes";
+import { PIN_TYPES } from "@/lib/pinTypes";
+import { buildClusterFlyToTarget } from "@/lib/flyToCommands";
 
 const GLOBE_RADIUS = 1;
 
@@ -53,9 +54,8 @@ export default function DiasporaGlobe({
   arrivedIds,
   onPinClick,
   onGlobeClick,
-  searchQuery,
-  searchTrigger,
-  flyToCoords,
+  searchFlyToCommand,
+  flyToCommand,
 }) {
   const mountRef = useRef(null);
   const overlayRefs = useRef({});      // keyed by cluster.id
@@ -74,7 +74,6 @@ export default function DiasporaGlobe({
   const pinchRef = useRef({ active: false, dist: 0 });
 
   const [hovered, setHovered] = useState(null);
-  const [notFound, setNotFound] = useState(false);
   const [zoomZ, setZoomZ] = useState(2.8);
 
   useEffect(() => { filterRef.current = filter; }, [filter]);
@@ -393,17 +392,14 @@ export default function DiasporaGlobe({
   }, []);
 
   useEffect(() => {
-    if (flyToCoords?.lat != null && flyToCoords?.lng != null) {
-      flyTo(flyToCoords, flyToCoords.zoom);
-      return;
-    }
-    if (!searchQuery) return;
-    const key = String(searchQuery).trim().toLowerCase();
-    const c = CITIES[key];
-    if (c) { setNotFound(false); flyTo(c); }
-    else { setNotFound(true); setTimeout(() => setNotFound(false), 800); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTrigger, flyToCoords]);
+    if (flyToCommand?.lat == null || flyToCommand?.lng == null) return;
+    flyTo(flyToCommand, flyToCommand.zoom);
+  }, [flyTo, flyToCommand]);
+
+  useEffect(() => {
+    if (searchFlyToCommand?.lat == null || searchFlyToCommand?.lng == null) return;
+    flyTo(searchFlyToCommand, searchFlyToCommand.zoom);
+  }, [flyTo, searchFlyToCommand]);
 
   // Hover tooltip target
   const hoveredCluster = useMemo(() => clusters.find((c) => c.id === hovered), [clusters, hovered]);
@@ -413,22 +409,9 @@ export default function DiasporaGlobe({
       onPinClick?.(c.pins[0]);
       return;
     }
-    // Compute spread → choose zoom level that will guarantee cluster expands
-    const lats = c.pins.map((p) => p.lat);
-    const lngs = c.pins.map((p) => p.lng);
-    const spread = Math.max(
-      Math.max(...lats) - Math.min(...lats),
-      Math.max(...lngs) - Math.min(...lngs),
-      0.05
-    );
-    // Reverse cluster radius formula: r = 0.02 + t^1.4 * 12 → t = ((r-0.02)/12)^(1/1.4)
-    // We want r ≈ spread * 0.4 so cluster breaks
-    const desiredR = Math.max(0.05, spread * 0.4);
-    const t = Math.pow(Math.max(0, (desiredR - 0.02) / 12), 1 / 1.4);
-    const targetZ = clamp(1.25 + t * (5.5 - 1.25), 1.25, 4.5);
-    // Always move closer than current
     const currentZ = threeRef.current?.camera?.position?.z ?? zoomZ;
-    flyTo({ lat: c.lat, lng: c.lng }, Math.min(targetZ, currentZ * 0.6));
+    const target = buildClusterFlyToTarget(c, currentZ);
+    flyTo({ lat: target.lat, lng: target.lng }, target.zoom);
   };
 
   return (
@@ -490,12 +473,6 @@ export default function DiasporaGlobe({
 
       {hoveredCluster && (
         <ClusterTooltip cluster={hoveredCluster} />
-      )}
-
-      {notFound && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-red-500/20 backdrop-blur border border-red-400/30 text-sm text-red-200" data-testid="search-not-found">
-          Şehir bulunamadı, geocoding deneniyor…
-        </div>
       )}
     </div>
   );

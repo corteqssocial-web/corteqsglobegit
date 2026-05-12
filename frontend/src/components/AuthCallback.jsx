@@ -3,6 +3,18 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 
+function getOAuthPayload() {
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const search = new URLSearchParams(window.location.search);
+
+  return {
+    accessToken: hash.get("access_token"),
+    refreshToken: hash.get("refresh_token"),
+    code: search.get("code"),
+    error: hash.get("error_description") || hash.get("error") || search.get("error_description") || search.get("error"),
+  };
+}
+
 export default function AuthCallback() {
   const navigate = useNavigate();
   const { refresh } = useAuth();
@@ -27,19 +39,22 @@ export default function AuthCallback() {
       }
     };
 
+    const { accessToken, refreshToken, code, error: oauthError } = getOAuthPayload();
+
     // Strategy: wait for Supabase to detect session from URL
     // - Implicit flow: #access_token=... (detectSessionInUrl: true handles automatically)
     // - PKCE flow: ?code=... (Supabase exchanges automatically)
     // Both fire onAuthStateChange when done.
-    const hasOAuthParams =
-      window.location.hash.includes("access_token=") ||
-      window.location.search.includes("code=") ||
-      window.location.hash.includes("error=") ||
-      window.location.search.includes("error=");
+    const hasOAuthParams = Boolean(accessToken || code || oauthError);
 
     if (!hasOAuthParams) {
       // No OAuth params — go home
       navigate("/", { replace: true });
+      return;
+    }
+
+    if (oauthError) {
+      setError(oauthError);
       return;
     }
 
@@ -53,13 +68,36 @@ export default function AuthCallback() {
     });
     unsubscribe = () => data?.subscription?.unsubscribe?.();
 
-    // Fallback: check immediately in case session is already set
+    // Fallback:
+    // 1) explicitly set/exchange the session if URL payload exists and Supabase hasn't done it yet
+    // 2) then immediately check whether a session is available
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
+      try {
+        const { data: { session: existingSession } } = await supabase.auth.getSession();
+
+        if (!existingSession) {
+          if (accessToken && refreshToken) {
+            const { error: setSessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            if (setSessionError) throw setSessionError;
+          } else if (code) {
+            const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+            if (exchangeError) throw exchangeError;
+          }
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          if (timeoutId) clearTimeout(timeoutId);
+          unsubscribe?.();
+          finish();
+        }
+      } catch (sessionError) {
         if (timeoutId) clearTimeout(timeoutId);
         unsubscribe?.();
-        finish();
+        setError(sessionError?.message || "Oturum kurulamadı.");
       }
     })();
 

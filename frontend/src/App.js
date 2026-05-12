@@ -12,22 +12,23 @@ import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { Plus, LogOut, Shield, Globe2 } from "lucide-react";
 import { PIN_TYPES } from "@/lib/pinTypes";
+import { buildFlyToCommand, PIN_FLY_TO_ZOOM } from "@/lib/flyToCommands";
 import api from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import "@/App.css";
 
-function MainScreen() {
-  const { user, loading, logout } = useAuth();
+export function MainScreen() {
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const [pins, setPins] = useState([]);
   const [filter, setFilter] = useState("all");
-  const [searchQuery, setSearchQuery] = useState(null);
-  const [searchTrigger, setSearchTrigger] = useState(0);
-  const [flyToCoords, setFlyToCoords] = useState(null);
+  const [searchFlyToCommand, setSearchFlyToCommand] = useState(null);
+  const [flyToCommand, setFlyToCommand] = useState(null);
   const [arrivedIds, setArrivedIds] = useState(new Set()); // pins that just arrived via realtime — get wow effect
   const arrivedTimers = useRef({});
+  const flyToCommandSeq = useRef(0);
 
   const [authOpen, setAuthOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -64,6 +65,25 @@ function MainScreen() {
 
   useEffect(() => { loadPins(); }, [loadPins]);
 
+  const nextFlyToCommandId = useCallback(() => {
+    flyToCommandSeq.current += 1;
+    return flyToCommandSeq.current;
+  }, []);
+
+  const dispatchFlyToCommand = useCallback((coords, options = {}) => {
+    const command = buildFlyToCommand(coords, nextFlyToCommandId(), options);
+    if (command) {
+      setFlyToCommand(command);
+    }
+  }, [nextFlyToCommandId]);
+
+  const dispatchSearchFlyToCommand = useCallback((coords, options = {}) => {
+    const command = buildFlyToCommand(coords, nextFlyToCommandId(), options);
+    if (command) {
+      setSearchFlyToCommand(command);
+    }
+  }, [nextFlyToCommandId]);
+
   // ----- Realtime subscription: live updates when pins are inserted/approved/rejected/deleted -----
   useEffect(() => {
     const channel = supabase
@@ -88,8 +108,7 @@ function MainScreen() {
           const me = userRef.current;
           if (me && np.user_id === me.id) {
             toast.success(`🎉 Pin'in onaylandı: ${np.name}`, { duration: 6000 });
-            setFlyToCoords({ lat: np.lat, lng: np.lng, zoom: 1.7 });
-            setSearchTrigger((x) => x + 1);
+            dispatchFlyToCommand(np, { zoom: PIN_FLY_TO_ZOOM, source: "approval" });
           } else if (t) {
             toast(`${t.emoji} Onaylandı: ${np.name} · ${np.city}`);
           }
@@ -110,7 +129,7 @@ function MainScreen() {
       Object.values(arrivedTimers.current).forEach(clearTimeout);
       arrivedTimers.current = {};
     };
-  }, [markArrived]);
+  }, [dispatchFlyToCommand, markArrived]);
 
   // Auto-seed if globe is empty and user is admin (handy for first-run)
   useEffect(() => {
@@ -122,9 +141,8 @@ function MainScreen() {
   }, [user, pins.length, loadPins]);
 
   const onFly = useCallback((coords) => {
-    setFlyToCoords(coords);
-    setSearchTrigger((x) => x + 1);
-  }, []);
+    dispatchSearchFlyToCommand(coords, { source: "search" });
+  }, [dispatchSearchFlyToCommand]);
 
   const onGlobeClick = useCallback((coords) => {
     if (!addMode) return;
@@ -155,15 +173,14 @@ function MainScreen() {
           // Defer briefly so Three.js initial setup is ready
           setTimeout(() => {
             if (cancelled) return;
-            setFlyToCoords({ lat, lng });
-            setSearchTrigger((x) => x + 1);
+            dispatchFlyToCommand({ lat, lng }, { source: "geoip" });
             if (city) toast(`🌍 ${city}${country_name ? `, ${country_name}` : ""}`, { duration: 3000 });
           }, 1200);
         }
       } catch { /* silent */ }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [dispatchFlyToCommand]);
 
   const counts = useMemo(() => {
     const out = { all: pins.length };
@@ -186,9 +203,8 @@ function MainScreen() {
         arrivedIds={arrivedIds}
         onPinClick={onPinClick}
         onGlobeClick={onGlobeClick}
-        searchQuery={searchQuery}
-        searchTrigger={searchTrigger}
-        flyToCoords={flyToCoords}
+        searchFlyToCommand={searchFlyToCommand}
+        flyToCommand={flyToCommand}
       />
 
       {/* Top bar */}
@@ -294,8 +310,7 @@ function MainScreen() {
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         onFlyTo={(p) => {
-          setFlyToCoords({ lat: p.lat, lng: p.lng, zoom: 1.7 });
-          setSearchTrigger((x) => x + 1);
+          dispatchFlyToCommand(p, { zoom: PIN_FLY_TO_ZOOM, source: "pin-drawer" });
           setDrawerOpen(false);
         }}
       />
