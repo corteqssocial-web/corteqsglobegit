@@ -37,7 +37,7 @@ export function buildClusterFlyToTarget(cluster, currentZ) {
 
 export function buildFlyToState(coords, currentRotationY, currentZoom, requestedZoom) {
   const targetRotationY = normalizeAngle(-toRadians(coords.lng));
-  const targetRotationX = clamp(-toRadians(coords.lat), -MAX_GLOBE_TILT, MAX_GLOBE_TILT);
+  const targetRotationX = clamp(toRadians(coords.lat), -MAX_GLOBE_TILT, MAX_GLOBE_TILT);
   const deltaY = shortestAngleDelta(currentRotationY, targetRotationY);
 
   return {

@@ -5,6 +5,39 @@ import {
   MIN_GLOBE_ZOOM,
 } from "./flyToCommands";
 
+function latLngTo3D(lat, lng, r = 1) {
+  const phi = (90 - lat) * (Math.PI / 180);
+  const theta = lng * (Math.PI / 180);
+
+  return {
+    x: r * Math.sin(phi) * Math.sin(theta),
+    y: r * Math.cos(phi),
+    z: r * Math.sin(phi) * Math.cos(theta),
+  };
+}
+
+function rotateY(point, angle) {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+
+  return {
+    x: point.x * c + point.z * s,
+    y: point.y,
+    z: -point.x * s + point.z * c,
+  };
+}
+
+function rotateX(point, angle) {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+
+  return {
+    x: point.x,
+    y: point.y * c - point.z * s,
+    z: point.y * s + point.z * c,
+  };
+}
+
 describe("flyToCommands", () => {
   it("computes globe fly-to rotations using longitude-first targeting", () => {
     const state = buildFlyToState(
@@ -14,10 +47,49 @@ describe("flyToCommands", () => {
       1.7
     );
 
-    expect(state.targetRotationX).toBeCloseTo(-0.9166, 3);
+    expect(state.targetRotationX).toBeCloseTo(0.9166, 3);
     expect(state.targetRotationY).toBeCloseTo(-0.2339, 3);
     expect(state.finalRotationY).toBeCloseTo(-0.2339, 3);
     expect(state.targetZoom).toBe(1.7);
+  });
+
+  it("centers northern hemisphere targets on the front of the globe", () => {
+    const coords = { lat: 52.52, lng: 13.405 };
+    const state = buildFlyToState(coords, 0, 2.8, 1.7);
+    const rotated = rotateX(
+      rotateY(latLngTo3D(coords.lat, coords.lng), state.finalRotationY),
+      state.targetRotationX
+    );
+
+    expect(rotated.x).toBeCloseTo(0, 6);
+    expect(rotated.y).toBeCloseTo(0, 6);
+    expect(rotated.z).toBeCloseTo(1, 6);
+  });
+
+  it("centers southern hemisphere targets on the front of the globe", () => {
+    const coords = { lat: -33.87, lng: 151.21 };
+    const state = buildFlyToState(coords, 0, 2.8, 1.7);
+    const rotated = rotateX(
+      rotateY(latLngTo3D(coords.lat, coords.lng), state.finalRotationY),
+      state.targetRotationX
+    );
+
+    expect(rotated.x).toBeCloseTo(0, 6);
+    expect(rotated.y).toBeCloseTo(0, 6);
+    expect(rotated.z).toBeCloseTo(1, 6);
+  });
+
+  it("centers targets with very different longitudes on the front of the globe", () => {
+    const coords = { lat: 41.01, lng: 28.96 };
+    const state = buildFlyToState(coords, 0, 2.8, 1.7);
+    const rotated = rotateX(
+      rotateY(latLngTo3D(coords.lat, coords.lng), state.finalRotationY),
+      state.targetRotationX
+    );
+
+    expect(rotated.x).toBeCloseTo(0, 6);
+    expect(rotated.y).toBeCloseTo(0, 6);
+    expect(rotated.z).toBeCloseTo(1, 6);
   });
 
   it("uses the shortest wrap-around path for longitude rotation", () => {
