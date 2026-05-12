@@ -2,6 +2,8 @@ FROM node:24-alpine AS build
 
 WORKDIR /app
 
+ENV NODE_ENV=development
+
 ARG REACT_APP_BACKEND_URL
 ARG REACT_APP_SUPABASE_URL
 ARG REACT_APP_SUPABASE_ANON_KEY
@@ -14,7 +16,7 @@ ENV ENABLE_HEALTH_CHECK=$ENABLE_HEALTH_CHECK
 
 COPY package*.json ./
 
-RUN npm install
+RUN npm ci --include=dev
 
 COPY . .
 
