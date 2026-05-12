@@ -1,7 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Search, Loader2 } from "lucide-react";
-import { CITIES } from "@/lib/pinTypes";
 import api from "@/lib/api";
+import {
+  findExactLocalCity,
+  formatCityLabel,
+  getLocalCityMatches,
+  rankRemoteGeocodeResults,
+} from "@/lib/citySearch";
 
 export default function SearchBar({ onFly }) {
   const [q, setQ] = useState("");
@@ -21,15 +26,24 @@ export default function SearchBar({ onFly }) {
     }
     debounceRef.current = setTimeout(async () => {
       // First: local CITIES match
-      const matches = Object.entries(CITIES)
-        .filter(([k]) => k.includes(q.toLowerCase()))
-        .slice(0, 3)
-        .map(([k, v]) => ({ label: k.replace(/\b\w/g, (c) => c.toUpperCase()), city: k, lat: v.lat, lng: v.lng, source: "local" }));
+      const matches = getLocalCityMatches(q, 3);
+      const exactLocal = findExactLocalCity(q);
+      if (exactLocal) {
+        setResults([{
+          label: exactLocal.label,
+          city: exactLocal.key,
+          lat: exactLocal.lat,
+          lng: exactLocal.lng,
+          source: "local",
+        }]);
+        setOpen(true);
+        return;
+      }
       // Then: geocode
       try {
         const res = await api.get("/geocode", { params: { q } });
-        const remote = (res.data.results || []).slice(0, 5).map((r) => ({ ...r, source: "google" }));
-        const combined = [...matches, ...remote.filter((r) => !matches.find((m) => m.city?.toLowerCase() === r.city?.toLowerCase()))].slice(0, 6);
+        const remote = rankRemoteGeocodeResults(res.data.results || [], q, matches);
+        const combined = [...matches, ...remote].slice(0, 6);
         setResults(combined);
         setOpen(combined.length > 0);
       } catch {
@@ -42,9 +56,11 @@ export default function SearchBar({ onFly }) {
   const submit = async (e) => {
     e?.preventDefault?.();
     if (!q.trim()) return;
-    const key = q.trim().toLowerCase();
-    if (CITIES[key]) {
-      onFly(CITIES[key]);
+    const localCity = findExactLocalCity(q);
+    if (localCity) {
+      onFly({ lat: localCity.lat, lng: localCity.lng });
+      ignoreRef.current = true;
+      setQ(localCity.label);
       setOpen(false);
       return;
     }
@@ -64,7 +80,7 @@ export default function SearchBar({ onFly }) {
   const pick = (r) => {
     onFly({ lat: r.lat, lng: r.lng });
     ignoreRef.current = true;
-    setQ(r.city ? r.city.replace(/\b\w/g, (c) => c.toUpperCase()) : r.label);
+    setQ(r.city ? formatCityLabel(r.city) : r.label);
     setOpen(false);
   };
 
