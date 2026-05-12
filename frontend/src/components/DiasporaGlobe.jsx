@@ -1,14 +1,14 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import * as THREE from "three";
 import { PIN_TYPES } from "@/lib/pinTypes";
-import { buildClusterFlyToTarget, buildFlyToState, MAX_GLOBE_ZOOM, MIN_GLOBE_ZOOM } from "@/lib/flyToCommands";
+import { buildClusterFlyToTarget, buildFlyToState, GLOBE_LONGITUDE_OFFSET_DEG, MAX_GLOBE_ZOOM, MIN_GLOBE_ZOOM } from "@/lib/flyToCommands";
 
 const GLOBE_RADIUS = 1;
 const OVERLAP_THRESHOLD_PX = 14;
 
 function latLngTo3D(lat, lng, r = GLOBE_RADIUS) {
   const phi = (90 - lat) * (Math.PI / 180);
-  const theta = lng * (Math.PI / 180);
+  const theta = (lng + GLOBE_LONGITUDE_OFFSET_DEG) * (Math.PI / 180);
   return new THREE.Vector3(
     r * Math.sin(phi) * Math.sin(theta),
     r * Math.cos(phi),
@@ -308,7 +308,7 @@ export default function DiasporaGlobe({
         if (earthHits.length > 0) {
           const local = t.earthMesh.worldToLocal(earthHits[0].point.clone());
           const lat = 90 - (Math.acos(local.y / GLOBE_RADIUS) * 180 / Math.PI);
-          const lng = (Math.atan2(local.x, local.z) * 180 / Math.PI);
+          const lng = (Math.atan2(local.x, local.z) * 180 / Math.PI) - GLOBE_LONGITUDE_OFFSET_DEG;
           onGlobeClick({ lat, lng });
         }
       }
