@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import * as THREE from "three";
 import { PIN_TYPES } from "@/lib/pinTypes";
-import { buildClusterFlyToTarget } from "@/lib/flyToCommands";
+import { buildClusterFlyToTarget, buildFlyToState, MAX_GLOBE_ZOOM, MIN_GLOBE_ZOOM } from "@/lib/flyToCommands";
 
 const GLOBE_RADIUS = 1;
 
@@ -107,6 +107,7 @@ export default function DiasporaGlobe({
     mount.appendChild(renderer.domElement);
 
     const globe = new THREE.Group();
+    globe.rotation.order = "YXZ";
     scene.add(globe);
 
     const earthMat = new THREE.MeshPhongMaterial({ color: 0x1a3d78, shininess: 18, specular: 0x222244 });
@@ -289,7 +290,7 @@ export default function DiasporaGlobe({
       e.preventDefault();
       const t = threeRef.current;
       if (!t.camera) return;
-      t.camera.position.z = clamp(t.camera.position.z + e.deltaY * 0.002, 1.25, 5.5);
+      t.camera.position.z = clamp(t.camera.position.z + e.deltaY * 0.002, MIN_GLOBE_ZOOM, MAX_GLOBE_ZOOM);
       beginInteract(); endInteract();
     };
 
@@ -327,7 +328,7 @@ export default function DiasporaGlobe({
         if (pinchRef.current.active && pinchRef.current.dist > 0) {
           const delta = pinchRef.current.dist - dist;
           const t = threeRef.current;
-          if (t.camera) t.camera.position.z = clamp(t.camera.position.z + delta * 0.005, 1.25, 5.5);
+          if (t.camera) t.camera.position.z = clamp(t.camera.position.z + delta * 0.005, MIN_GLOBE_ZOOM, MAX_GLOBE_ZOOM);
         }
         pinchRef.current.dist = dist;
       }
@@ -364,24 +365,22 @@ export default function DiasporaGlobe({
     const t = threeRef.current;
     if (!t.globe || !t.camera) return;
     autoRotate.current = false;
-    const targetY = -coords.lng * (Math.PI / 180);
-    // Match the actual globe coordinate system so fly-to centers the selected pin.
-    const targetX = clamp(-(coords.lat * Math.PI) / 180, -1.3, 1.3);
-    let diffY = targetY - t.globe.rotation.y;
-    while (diffY > Math.PI) diffY -= 2 * Math.PI;
-    while (diffY < -Math.PI) diffY += 2 * Math.PI;
-    const finalY = t.globe.rotation.y + diffY;
     const sy = t.globe.rotation.y;
     const sx = t.globe.rotation.x;
     const sz = t.camera.position.z;
-    const tz = zoomTarget != null ? clamp(zoomTarget, 1.25, 5.5) : Math.max(1.55, sz - 0.5);
+    const nextState = buildFlyToState(coords, sy, sz, zoomTarget);
+    const { finalRotationY, targetRotationX, targetZoom } = nextState;
 
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("corteqs:fly-to", {
         detail: {
           lat: coords.lat,
           lng: coords.lng,
-          zoom: tz,
+          zoom: targetZoom,
+          targetRotationX,
+          targetRotationY: nextState.targetRotationY,
+          finalRotationY,
+          rotationOrder: t.globe.rotation.order,
         },
       }));
     }
@@ -390,9 +389,9 @@ export default function DiasporaGlobe({
     const fly = () => {
       p = Math.min(p + 0.025, 1);
       const e = easeOutCubic(p);
-      t.globe.rotation.y = sy + (finalY - sy) * e;
-      t.globe.rotation.x = sx + (targetX - sx) * e;
-      t.camera.position.z = sz + (tz - sz) * e;
+      t.globe.rotation.y = sy + (finalRotationY - sy) * e;
+      t.globe.rotation.x = sx + (targetRotationX - sx) * e;
+      t.camera.position.z = sz + (targetZoom - sz) * e;
       if (p < 1) requestAnimationFrame(fly);
       else {
         if (dragTimer.current) clearTimeout(dragTimer.current);
