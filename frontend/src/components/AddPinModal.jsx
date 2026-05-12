@@ -27,6 +27,8 @@ export default function AddPinModal({ open, onOpenChange, lat, lng, onCreated })
   const [selectedLocation, setSelectedLocation] = useState(null);
   const fileRef = useRef();
   const locationDebounceRef = useRef();
+  const activeLat = selectedLocation?.lat ?? lat;
+  const activeLng = selectedLocation?.lng ?? lng;
 
   const reset = () => {
     setName(""); setCity(""); setHood(""); setDescription(""); setType("person");
@@ -147,8 +149,15 @@ export default function AddPinModal({ open, onOpenChange, lat, lng, onCreated })
         <DialogHeader>
           <DialogTitle className="text-2xl tracking-tight">Pin Ekle</DialogTitle>
           <DialogDescription className="text-white/60">
-            {lat != null && lng != null ? (
-              <>Konum: <code className="text-white/80">{lat.toFixed(3)}, {lng.toFixed(3)}</code></>
+            {activeLat != null && activeLng != null ? (
+              <>
+                Konum:
+                {" "}
+                <code className="text-white/80">{activeLat.toFixed(3)}, {activeLng.toFixed(3)}</code>
+                {selectedLocation?.label ? (
+                  <span className="ml-2 text-emerald-200/80">· {selectedLocation.label}</span>
+                ) : null}
+              </>
             ) : "Önce haritada bir konum seç."}
           </DialogDescription>
         </DialogHeader>
