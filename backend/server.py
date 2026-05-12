@@ -63,6 +63,7 @@ class PinIn(BaseModel):
     country_code: Optional[str] = ""
     provider: Optional[str] = ""
     provider_id: Optional[str] = ""
+    visibility: Optional[str] = "public"
 
 
 class PinOut(BaseModel):
@@ -96,6 +97,7 @@ class LoginIn(BaseModel):
 
 class PatchPinIn(BaseModel):
     status: str  # approved | rejected | pending
+    rejection_reason: Optional[str] = ""
 
 
 class UserOut(BaseModel):
@@ -479,7 +481,14 @@ async def list_pins(request: Request):
         if u and u.get("is_admin"):
             res = sb.table("pins").select("*").order("created_at", desc=True).execute()
         else:
-            res = sb.table("pins").select("*").eq("status", "approved").order("created_at", desc=True).execute()
+            res = (
+                sb.table("pins")
+                .select("*")
+                .eq("status", "approved")
+                .eq("visibility", "public")
+                .order("created_at", desc=True)
+                .execute()
+            )
         return {"pins": res.data or [], "setup_required": False}
     except Exception as e:
         log.warning("Pins query failed (setup likely required): %s", e)
@@ -503,7 +512,10 @@ async def create_pin(body: PinIn, user: dict = Depends(require_user)):
     valid = {"person", "business", "ngo", "creator", "event"}
     if body.type not in valid:
         raise HTTPException(status_code=400, detail=f"type must be one of {valid}")
+    if body.visibility not in {"public", "private"}:
+        raise HTTPException(status_code=400, detail="visibility must be public or private")
     pin_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
     payload = {
         "id": pin_id,
         "type": body.type,
@@ -519,9 +531,14 @@ async def create_pin(body: PinIn, user: dict = Depends(require_user)):
         "country_code": (body.country_code or "").strip().upper(),
         "provider": (body.provider or "").strip(),
         "provider_id": (body.provider_id or "").strip(),
+        "visibility": body.visibility,
         "status": "pending",
         "user_id": user["id"],
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "rejection_reason": "",
+        "approved_at": None,
+        "approved_by": None,
+        "created_at": now,
+        "updated_at": now,
     }
     sb.table("pins").insert(payload).execute()
     return {"pin": payload}
@@ -583,7 +600,23 @@ async def geoip(request: Request):
 async def update_pin(pin_id: str, body: PatchPinIn, user: dict = Depends(require_admin)):
     if body.status not in {"approved", "rejected", "pending"}:
         raise HTTPException(status_code=400, detail="Invalid status")
-    res = sb.table("pins").update({"status": body.status}).eq("id", pin_id).execute()
+    update_payload = {
+        "status": body.status,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if body.status == "approved":
+        update_payload["approved_at"] = datetime.now(timezone.utc).isoformat()
+        update_payload["approved_by"] = user["id"]
+        update_payload["rejection_reason"] = ""
+    elif body.status == "rejected":
+        update_payload["rejection_reason"] = (body.rejection_reason or "").strip()
+        update_payload["approved_at"] = None
+        update_payload["approved_by"] = None
+    else:
+        update_payload["approved_at"] = None
+        update_payload["approved_by"] = None
+        update_payload["rejection_reason"] = ""
+    res = sb.table("pins").update(update_payload).eq("id", pin_id).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="Pin not found")
     return {"pin": res.data[0]}
@@ -683,7 +716,18 @@ async def seed():
     now = datetime.now(timezone.utc).isoformat()
     rows = []
     for p in SAMPLE_PINS:
-        rows.append({**p, "id": str(uuid.uuid4()), "status": "approved", "created_at": now, "user_id": None})
+        rows.append({
+            **p,
+            "id": str(uuid.uuid4()),
+            "status": "approved",
+            "visibility": "public",
+            "rejection_reason": "",
+            "approved_at": now,
+            "approved_by": None,
+            "created_at": now,
+            "updated_at": now,
+            "user_id": None,
+        })
     sb.table("pins").insert(rows).execute()
     return {"ok": True, "inserted": len(rows)}
 

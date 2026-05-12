@@ -13,6 +13,7 @@ export default function AdminPanel() {
   const [pins, setPins] = useState([]);
   const [filter, setFilter] = useState("pending");
   const [fetching, setFetching] = useState(true);
+  const [rejectionReasons, setRejectionReasons] = useState({});
 
   useEffect(() => {
     if (loading) return;
@@ -38,7 +39,10 @@ export default function AdminPanel() {
 
   const setStatus = async (id, status) => {
     try {
-      await api.patch(`/pins/${id}`, { status });
+      await api.patch(`/pins/${id}`, {
+        status,
+        rejection_reason: status === "rejected" ? rejectionReasons[id] || "" : "",
+      });
       toast.success(`Pin ${status === "approved" ? "onaylandı" : status === "rejected" ? "reddedildi" : "beklemeye alındı"}`);
       load();
     } catch (e) { toast.error("İşlem başarısız"); }
@@ -100,9 +104,20 @@ export default function AdminPanel() {
                       <div className="text-xs text-white/50 truncate">
                         {t.label} · {p.city}{p.hood ? ` / ${p.hood}` : ""} · {p.lat?.toFixed(2)}, {p.lng?.toFixed(2)}
                       </div>
+                      {p.rejection_reason && (
+                        <div className="mt-1 text-xs text-amber-200/90">
+                          Red nedeni: {p.rejection_reason}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <input
+                      value={rejectionReasons[p.id] || ""}
+                      onChange={(event) => setRejectionReasons((current) => ({ ...current, [p.id]: event.target.value }))}
+                      placeholder="Red nedeni"
+                      className="w-36 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none"
+                    />
                     <Badge variant="outline" className={
                       p.status === "approved" ? "border-emerald-500/40 text-emerald-300" :
                       p.status === "rejected" ? "border-red-500/40 text-red-300" :

@@ -1,0 +1,36 @@
+const now = new Date().toISOString();
+
+export const DEMO_PINS = [
+  {
+    id: "demo-dortmund",
+    user_id: "demo",
+    name: "Dortmund",
+    title: "Dortmund",
+    type: "person",
+    category: "person",
+    city: "Dortmund",
+    country: "Germany",
+    lat: 51.5136,
+    lng: 7.4653,
+    status: "approved",
+    visibility: "public",
+    created_at: now,
+    updated_at: now,
+  },
+  {
+    id: "demo-istanbul",
+    user_id: "demo",
+    name: "Istanbul Community",
+    title: "Istanbul Community",
+    type: "ngo",
+    category: "ngo",
+    city: "Istanbul",
+    country: "Türkiye",
+    lat: 41.0082,
+    lng: 28.9784,
+    status: "approved",
+    visibility: "public",
+    created_at: now,
+    updated_at: now,
+  },
+];

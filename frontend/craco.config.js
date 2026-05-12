@@ -1,5 +1,6 @@
 // craco.config.js
 const path = require("path");
+const CopyWebpackPlugin = require("copy-webpack-plugin");
 require("dotenv").config();
 
 // Environment variable overrides
@@ -57,6 +58,18 @@ const webpackConfig = {
       if (config.enableHealthCheck && healthPluginInstance) {
         webpackConfig.plugins.push(healthPluginInstance);
       }
+
+      webpackConfig.plugins.push(
+        new CopyWebpackPlugin({
+          patterns: [
+            { from: path.join(__dirname, "node_modules/cesium/Build/Cesium/Workers"), to: "static/cesium/Workers" },
+            { from: path.join(__dirname, "node_modules/cesium/Build/Cesium/ThirdParty"), to: "static/cesium/ThirdParty" },
+            { from: path.join(__dirname, "node_modules/cesium/Build/Cesium/Assets"), to: "static/cesium/Assets" },
+            { from: path.join(__dirname, "node_modules/cesium/Build/Cesium/Widgets"), to: "static/cesium/Widgets" },
+          ],
+        })
+      );
+
       return webpackConfig;
     },
   },
