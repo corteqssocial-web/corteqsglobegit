@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import * as Cesium from "cesium";
+import Cesium from "cesium";
 import { DEFAULT_CAMERA } from "@/features/globe/constants/defaultCamera";
 import { getPinIcon } from "@/features/globe/utils/pinIcons";
 import { flyToDefaultView, flyToLocation } from "@/features/globe/utils/cesiumCamera";

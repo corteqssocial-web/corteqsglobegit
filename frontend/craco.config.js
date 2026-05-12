@@ -39,6 +39,7 @@ const webpackConfig = {
   webpack: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      cesium$: path.resolve(__dirname, "node_modules/cesium/index.cjs"),
     },
     configure: (webpackConfig) => {
       // Add ignored patterns to reduce watched directories

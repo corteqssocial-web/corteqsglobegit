@@ -1,4 +1,4 @@
-import * as Cesium from "cesium";
+import Cesium from "cesium";
 import { DEFAULT_CAMERA } from "@/features/globe/constants/defaultCamera";
 
 export function flyToLocation(viewer, lat, lng, height = DEFAULT_CAMERA.height) {
